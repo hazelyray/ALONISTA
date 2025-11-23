@@ -1,24 +1,101 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.shape.*?>
-<?import javafx.scene.image.*?>
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
+<?import javafx.scene.effect.DropShadow?>
+<?import javafx.scene.image.*?>
 <?import javafx.scene.layout.*?>
+<?import javafx.scene.paint.Color?>
+<?import javafx.scene.shape.Rectangle?>
+<?import javafx.scene.text.Font?>
 
-<TitledPane animated="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="400.0" prefWidth="600.0" text="PaySTI" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.system.controller.LoginController">
-  <content>
-    <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-         <children>
-            <ImageView fitHeight="532.0" fitWidth="714.0" layoutX="-108.0" pickOnBounds="true" preserveRatio="true">
-               <image>
-                  <Image url="/images/omnibus.jpg" />
-               </image>
-            </ImageView>
-            <TabPane layoutX="424.0" layoutY="87.0" prefHeight="200.0" prefWidth="200.0" tabClosingPolicy="UNAVAILABLE" />
-            <PasswordField fx:id="passwordField" layoutX="299.0" layoutY="2.0" promptText="Enter Password" />
-            <TextField fx:id="usernameField" layoutX="130.0" layoutY="3.0" promptText="Enter email" />
-            <Button fx:id="loginButton" layoutX="472.0" layoutY="3.0" mnemonicParsing="false" text="login" onAction="#handleLogin" />
-         </children>
-    </AnchorPane>
-  </content>
-</TitledPane>
+<StackPane xmlns="http://javafx.com/javafx/21" 
+           xmlns:fx="http://javafx.com/fxml/1" 
+           fx:controller="com.example.system.controller.LoginController"
+           prefHeight="600.0" prefWidth="900.0"
+           style="-fx-background-color: #f0f2f5;">
+    
+    <!-- Background Image -->
+    <ImageView fitHeight="600.0" fitWidth="900.0" opacity="0.3" preserveRatio="false">
+        <image>
+            <Image url="/images/omnibus.jpg" />
+        </image>
+    </ImageView>
+    
+    <!-- Login Card -->
+    <VBox alignment="CENTER" maxWidth="400.0" spacing="25.0" 
+          style="-fx-background-color: white; -fx-background-radius: 15; -fx-padding: 40;">
+        <effect>
+            <DropShadow radius="20" offsetY="5">
+                <color>
+                    <Color opacity="0.3" />
+                </color>
+            </DropShadow>
+        </effect>
+        
+        <!-- Logo/Title -->
+        <VBox alignment="CENTER" spacing="10.0">
+            <Label text="PaySTI" textFill="#1e88e5" style="-fx-font-weight: bold;">
+                <font>
+                    <Font size="36.0" />
+                </font>
+            </Label>
+            <Label text="Tuition Management System" textFill="#666">
+                <font>
+                    <Font size="14.0" />
+                </font>
+            </Label>
+        </VBox>
+        
+        <!-- Login Form -->
+        <VBox spacing="15.0">
+            <!-- Username Field -->
+            <VBox spacing="5.0">
+                <Label text="Username" textFill="#333">
+                    <font>
+                        <Font size="13.0" />
+                    </font>
+                </Label>
+                <TextField fx:id="usernameField" promptText="Enter your username"
+                          style="-fx-background-radius: 5; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-padding: 10;">
+                    <font>
+                        <Font size="14.0" />
+                    </font>
+                </TextField>
+            </VBox>
+            
+            <!-- Password Field -->
+            <VBox spacing="5.0">
+                <Label text="Password" textFill="#333">
+                    <font>
+                        <Font size="13.0" />
+                    </font>
+                </Label>
+                <PasswordField fx:id="passwordField" promptText="Enter your password"
+                              style="-fx-background-radius: 5; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-padding: 10;">
+                    <font>
+                        <Font size="14.0" />
+                    </font>
+                </PasswordField>
+            </VBox>
+            
+            <!-- Login Button -->
+            <Button fx:id="loginButton" text="Login" maxWidth="Infinity" onAction="#handleLogin"
+                   style="-fx-background-color: #1e88e5; -fx-text-fill: white; -fx-background-radius: 5; -fx-cursor: hand; -fx-padding: 12;"
+                   onMouseEntered="#handleMouseEntered" onMouseExited="#handleMouseExited">
+                <font>
+                    <Font size="15.0" />
+                </font>
+            </Button>
+        </VBox>
+        
+        <!-- Footer Text -->
+        <Label text="Please use your student credentials to login" textFill="#999" wrapText="true" textAlignment="CENTER">
+            <font>
+                <Font size="11.0" />
+            </font>
+        </Label>
+        
+    </VBox>
+    
+</StackPane>

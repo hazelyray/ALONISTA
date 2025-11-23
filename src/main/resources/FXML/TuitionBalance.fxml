@@ -28,7 +28,10 @@ public class HomeController {
     private Label welcomeLabel;
 
     @FXML
-    private Label tuitionAmountLabel;
+    private Label tuitionBalanceLabel;
+
+    @FXML
+    private Label userNameLabel; // The label in top right that says "Welcome, Student"
 
     @Autowired
     private SessionManager sessionManager;
@@ -51,31 +54,50 @@ public class HomeController {
         if (currentUser != null) {
             System.out.println("Current user: " + currentUser.getUsername() + " - " + currentUser.getFullName());
             
-            // Update the welcome label
+            // Update the welcome labels with actual user data
+            if (userNameLabel != null) {
+                userNameLabel.setText("Welcome, " + currentUser.getFullName());
+                System.out.println("Updated userNameLabel to: Welcome, " + currentUser.getFullName());
+            } else {
+                System.out.println("userNameLabel is null - check FXML fx:id");
+            }
+            
             if (welcomeLabel != null) {
-                welcomeLabel.setText("Welcome, " + currentUser.getFullName());
-                System.out.println("Updated welcomeLabel");
+                welcomeLabel.setText("Welcome Back, " + currentUser.getFullName() + "! 🟧️");
+                System.out.println("Updated welcomeLabel to: Welcome Back, " + currentUser.getFullName() + "! 🟧️");
+            } else {
+                System.out.println("welcomeLabel is null - check FXML fx:id");
             }
 
-            // Load balance data from database
+            // Load actual balance data from database
             User user = userRepository.findByUsername(currentUser.getUsername()).orElse(null);
             if (user != null) {
                 System.out.println("Found user in database: " + user.getFullName());
                 
                 StudentBalance balance = user.getStudentBalance();
                 if (balance != null) {
-                    System.out.println("Student balance found: ₱" + balance.getRemainingBalance());
+                    System.out.println("Student balance found:");
+                    System.out.println("  Total Fee: " + balance.getTotalTuitionFee());
+                    System.out.println("  Amount Paid: " + balance.getAmountPaid());
+                    System.out.println("  Remaining: " + balance.getRemainingBalance());
                     
-                    if (tuitionAmountLabel != null) {
+                    if (tuitionBalanceLabel != null) {
                         String balanceText = "₱" + String.format("%,.2f", balance.getRemainingBalance());
-                        tuitionAmountLabel.setText(balanceText);
-                        System.out.println("Updated tuitionAmountLabel to: " + balanceText);
+                        tuitionBalanceLabel.setText(balanceText);
+                        System.out.println("Updated tuitionBalanceLabel to: " + balanceText);
+                    } else {
+                        System.out.println("tuitionBalanceLabel is null - check FXML fx:id");
                     }
                 } else {
                     System.out.println("No student balance found for user");
-                    if (tuitionAmountLabel != null) {
-                        tuitionAmountLabel.setText("₱0.00");
+                    if (tuitionBalanceLabel != null) {
+                        tuitionBalanceLabel.setText("₱0.00");
                     }
+                }
+            } else {
+                System.out.println("User not found in database for username: " + currentUser.getUsername());
+                if (tuitionBalanceLabel != null) {
+                    tuitionBalanceLabel.setText("₱0.00");
                 }
             }
         } else {
@@ -83,54 +105,86 @@ public class HomeController {
         }
     }
 
+    // Called by FXML: onAction="#handleLogout"
     @FXML
-    public void handleLogout(ActionEvent event) {
-        sessionManager.clearSession();
-        System.out.println("User logged out");
+    private void handleLogout(ActionEvent event) {
+        logoutAndNavigateToLogin(event);
+    }
+
+    // Your old method, still allowed
+    @FXML
+    private void handleSignOut(ActionEvent event) {
+        logoutAndNavigateToLogin(event);
+    }
+
+    private void logoutAndNavigateToLogin(ActionEvent event) {
+        // Clear the session
+        if (sessionManager != null) {
+            sessionManager.clearSession();
+            System.out.println("Session cleared on logout");
+        }
+        
         navigateToLogin(event);
     }
 
+    // Only used if Homepage.fxml has onAction="#handleTuitionBalance"
     @FXML
-    public void handleTuitionBalance(ActionEvent event) {
+    private void handleTuitionBalance(ActionEvent event) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/TuitionBalance.fxml"));
+            // Use the exact path - /FXML/TuitionBalance.fxml (uppercase)
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/TuitionBalance.fxml"));
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
 
             Stage stage = getStageFromEvent(event);
-            if (stage != null) {
-                stage.setScene(new Scene(root));
-                stage.setTitle("Tuition Balance");
-                stage.show();
-                System.out.println("Loaded tuition balance page");
-            }
+            stage.setScene(new Scene(root));
+            stage.setTitle("Tuition Balance");
+            stage.show();
+
+            System.out.println("Successfully loaded tuition balance from /FXML/TuitionBalance.fxml");
+
         } catch (Exception e) {
             e.printStackTrace();
             showError("Failed to load Tuition Balance page: " + e.getMessage());
         }
     }
 
+    // Load Login.fxml
     private void navigateToLogin(ActionEvent event) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+            // Use the exact path - /FXML/Login.fxml (uppercase)
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Login.fxml"));
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
 
             Stage stage = getStageFromEvent(event);
             if (stage != null) {
                 stage.setScene(new Scene(root));
-                stage.setTitle("Login - PaySTI");
+                stage.setTitle("Login");
                 stage.show();
-                System.out.println("Loaded login page");
+                System.out.println("Successfully loaded login page from /FXML/Login.fxml");
+            } else {
+                showError("Could not determine current window");
             }
+
         } catch (Exception e) {
             e.printStackTrace();
             showError("Failed to load Login page: " + e.getMessage());
+            
+            // Debug
+            try {
+                java.net.URL loginUrl = getClass().getResource("/FXML/Login.fxml");
+                System.out.println("Login FXML URL: " + loginUrl);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
     }
 
+    // Get Stage from event (works for MenuItem and Button)
     private Stage getStageFromEvent(ActionEvent event) {
         if (event == null) {
+            // Fallback: get any open stage
             for (Window window : Window.getWindows()) {
                 if (window instanceof Stage && window.isShowing()) {
                     return (Stage) window;
@@ -140,6 +194,7 @@ public class HomeController {
         }
         
         Object source = event.getSource();
+
         try {
             if (source instanceof MenuItem) {
                 MenuItem item = (MenuItem) source;
@@ -148,6 +203,7 @@ public class HomeController {
                 return (Stage) ((javafx.scene.Node) source).getScene().getWindow();
             }
         } catch (Exception e) {
+            // Fallback: find any open window
             for (Window w : Window.getWindows()) {
                 if (w instanceof Stage && w.isShowing()) {
                     return (Stage) w;

@@ -1,10 +1,12 @@
 package com.example.system.models;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -32,6 +34,12 @@ public class User {
     
     @Column(nullable = false)
     private boolean enabled = true;
+    
+    @Column(unique = true)
+    private String studentId;
+    
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    private StudentBalance studentBalance;
     
     // Constructors
     public User() {}
@@ -101,5 +109,21 @@ public class User {
     
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+    
+    public String getStudentId() {
+        return studentId;
+    }
+    
+    public void setStudentId(String studentId) {
+        this.studentId = studentId;
+    }
+    
+    public StudentBalance getStudentBalance() {
+        return studentBalance;
+    }
+    
+    public void setStudentBalance(StudentBalance studentBalance) {
+        this.studentBalance = studentBalance;
     }
 }

@@ -1,7 +1,9 @@
 package com.example.system;
 
-import org.springframework.boot.SpringApplication;
+import java.io.File;
+
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import javafx.application.Application;
@@ -25,15 +27,26 @@ public class SystemApplication extends Application {
     
     @Override
     public void init() throws Exception {
-        // Start Spring Boot in the background
-        springContext = SpringApplication.run(SystemApplication.class, args);
+        // Start Spring Boot without web server
+        springContext = new SpringApplicationBuilder(SystemApplication.class)
+            .headless(false)
+            .web(org.springframework.boot.WebApplicationType.NONE)
+            .run(args);
     }
     
     @Override
     public void start(Stage primaryStage) throws Exception {
-        // Load your login FXML file
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
-        // If you need Spring beans in your controller, set the controller factory:
+        // Load from absolute file path in src/main/resources
+        File fxmlFile = new File("src/main/resources/FXML/Login.fxml");
+        System.out.println("Starting app with FXML at: " + fxmlFile.getAbsolutePath());
+        System.out.println("File exists: " + fxmlFile.exists());
+        
+        if (!fxmlFile.exists()) {
+            System.err.println("ERROR: Login.fxml not found at: " + fxmlFile.getAbsolutePath());
+            return;
+        }
+        
+        FXMLLoader loader = new FXMLLoader(fxmlFile.toURI().toURL());
         loader.setControllerFactory(springContext::getBean);
         
         Parent root = loader.load();

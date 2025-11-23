@@ -1,11 +1,13 @@
 package com.example.system.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import com.example.system.dtos.LoginRequest;
 import com.example.system.dtos.LoginResponse;
 import com.example.system.services.AuthService;
+import com.example.system.session.SessionManager;
 
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -32,12 +34,25 @@ public class LoginController {
     @Autowired
     private AuthService authService;
     
-    private static LoginResponse currentUser;
+    @Autowired
+    private SessionManager sessionManager;
+    
+    @Autowired
+    private ApplicationContext springContext;
     
     @FXML
     public void initialize() {
-        // This method is called automatically after FXML is loaded
         System.out.println("Login Controller initialized");
+    }
+    
+    @FXML
+    public void handleMouseEntered() {
+        loginButton.setStyle("-fx-background-color: #1976d2; -fx-text-fill: white; -fx-background-radius: 5; -fx-cursor: hand; -fx-padding: 12;");
+    }
+    
+    @FXML
+    public void handleMouseExited() {
+        loginButton.setStyle("-fx-background-color: #1e88e5; -fx-text-fill: white; -fx-background-radius: 5; -fx-cursor: hand; -fx-padding: 12;");
     }
     
     @FXML
@@ -58,8 +73,10 @@ public class LoginController {
             // Call the backend authentication service
             LoginResponse response = authService.login(loginRequest);
             
-            // Save current user info
-            currentUser = response;
+            // Save to session
+            sessionManager.setCurrentUser(response);
+            
+            System.out.println("Login successful for: " + response.getFullName());
             
             // Show success message
             showAlert(Alert.AlertType.INFORMATION, "Login Successful", 
@@ -82,23 +99,26 @@ public class LoginController {
             // Get current stage
             Stage stage = (Stage) loginButton.getScene().getWindow();
             
-            // Load homepage FXML - try different paths
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Homepage.fxml"));
+            // Try to load from /fxml/ folder (lowercase)
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/Homepage.fxml"));
+            loader.setControllerFactory(springContext::getBean);
             
-            // Debug: Print the URL to see if file is found
-            System.out.println("Looking for: " + getClass().getResource("/FXML/Homepage.fxml"));
+            System.out.println("Loading Homepage from: " + getClass().getResource("/fxml/Homepage.fxml"));
             
             Parent root = loader.load();
             
             // Set the scene
             Scene scene = new Scene(root);
             stage.setScene(scene);
-            stage.setTitle("Tuition Management System - Home");
+            stage.setTitle("PaySTI - Home");
             stage.show();
             
+            System.out.println("Homepage loaded successfully");
+            
         } catch (Exception e) {
-            showAlert(Alert.AlertType.ERROR, "Error", "Could not load homepage");
+            System.err.println("Could not load homepage");
             e.printStackTrace();
+            showAlert(Alert.AlertType.ERROR, "Error", "Could not load homepage: " + e.getMessage());
         }
     }
     
@@ -108,10 +128,5 @@ public class LoginController {
         alert.setHeaderText(null);
         alert.setContentText(content);
         alert.showAndWait();
-    }
-    
-    // Static method to get current logged-in user
-    public static LoginResponse getCurrentUser() {
-        return currentUser;
     }
 }
