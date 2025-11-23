@@ -1,221 +1,140 @@
-package com.example.system.controller;
+<?xml version="1.0" encoding="UTF-8"?>
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
-import org.springframework.stereotype.Component;
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.effect.DropShadow?>
+<?import javafx.scene.image.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.paint.Color?>
+<?import javafx.scene.text.Font?>
 
-import com.example.system.dtos.LoginResponse;
-import com.example.system.models.StudentBalance;
-import com.example.system.models.User;
-import com.example.system.repositories.UserRepository;
-import com.example.system.session.SessionManager;
-
-import javafx.event.ActionEvent;
-import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
-import javafx.stage.Stage;
-import javafx.stage.Window;
-
-@Component
-public class HomeController {
-
-    @FXML
-    private Label welcomeLabel;
-
-    @FXML
-    private Label tuitionBalanceLabel;
-
-    @FXML
-    private Label userNameLabel; // The label in top right that says "Welcome, Student"
-
-    @Autowired
-    private SessionManager sessionManager;
-    
-    @Autowired
-    private ApplicationContext springContext;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @FXML
-    public void initialize() {
-        System.out.println("HomeController loaded.");
-        loadUserData();
-    }
-
-    private void loadUserData() {
-        LoginResponse currentUser = sessionManager.getCurrentUser();
-        
-        if (currentUser != null) {
-            System.out.println("Current user: " + currentUser.getUsername() + " - " + currentUser.getFullName());
-            
-            // Update the welcome labels with actual user data
-            if (userNameLabel != null) {
-                userNameLabel.setText("Welcome, " + currentUser.getFullName());
-                System.out.println("Updated userNameLabel to: Welcome, " + currentUser.getFullName());
-            } else {
-                System.out.println("userNameLabel is null - check FXML fx:id");
-            }
-            
-            if (welcomeLabel != null) {
-                welcomeLabel.setText("Welcome Back, " + currentUser.getFullName() + "! 🟧️");
-                System.out.println("Updated welcomeLabel to: Welcome Back, " + currentUser.getFullName() + "! 🟧️");
-            } else {
-                System.out.println("welcomeLabel is null - check FXML fx:id");
-            }
-
-            // Load actual balance data from database
-            User user = userRepository.findByUsername(currentUser.getUsername()).orElse(null);
-            if (user != null) {
-                System.out.println("Found user in database: " + user.getFullName());
-                
-                StudentBalance balance = user.getStudentBalance();
-                if (balance != null) {
-                    System.out.println("Student balance found:");
-                    System.out.println("  Total Fee: " + balance.getTotalTuitionFee());
-                    System.out.println("  Amount Paid: " + balance.getAmountPaid());
-                    System.out.println("  Remaining: " + balance.getRemainingBalance());
-                    
-                    if (tuitionBalanceLabel != null) {
-                        String balanceText = "₱" + String.format("%,.2f", balance.getRemainingBalance());
-                        tuitionBalanceLabel.setText(balanceText);
-                        System.out.println("Updated tuitionBalanceLabel to: " + balanceText);
-                    } else {
-                        System.out.println("tuitionBalanceLabel is null - check FXML fx:id");
-                    }
-                } else {
-                    System.out.println("No student balance found for user");
-                    if (tuitionBalanceLabel != null) {
-                        tuitionBalanceLabel.setText("₱0.00");
-                    }
-                }
-            } else {
-                System.out.println("User not found in database for username: " + currentUser.getUsername());
-                if (tuitionBalanceLabel != null) {
-                    tuitionBalanceLabel.setText("₱0.00");
-                }
-            }
-        } else {
-            System.out.println("No user found in session");
-        }
-    }
-
-    // Called by FXML: onAction="#handleLogout"
-    @FXML
-    private void handleLogout(ActionEvent event) {
-        logoutAndNavigateToLogin(event);
-    }
-
-    // Your old method, still allowed
-    @FXML
-    private void handleSignOut(ActionEvent event) {
-        logoutAndNavigateToLogin(event);
-    }
-
-    private void logoutAndNavigateToLogin(ActionEvent event) {
-        // Clear the session
-        if (sessionManager != null) {
-            sessionManager.clearSession();
-            System.out.println("Session cleared on logout");
-        }
-        
-        navigateToLogin(event);
-    }
-
-    // Only used if Homepage.fxml has onAction="#handleTuitionBalance"
-    @FXML
-    private void handleTuitionBalance(ActionEvent event) {
-        try {
-            // Use the exact path - /FXML/TuitionBalance.fxml (uppercase)
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/TuitionBalance.fxml"));
-            loader.setControllerFactory(springContext::getBean);
-            Parent root = loader.load();
-
-            Stage stage = getStageFromEvent(event);
-            stage.setScene(new Scene(root));
-            stage.setTitle("Tuition Balance");
-            stage.show();
-
-            System.out.println("Successfully loaded tuition balance from /FXML/TuitionBalance.fxml");
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            showError("Failed to load Tuition Balance page: " + e.getMessage());
-        }
-    }
-
-    // Load Login.fxml
-    private void navigateToLogin(ActionEvent event) {
-        try {
-            // Use the exact path - /FXML/Login.fxml (uppercase)
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Login.fxml"));
-            loader.setControllerFactory(springContext::getBean);
-            Parent root = loader.load();
-
-            Stage stage = getStageFromEvent(event);
-            if (stage != null) {
-                stage.setScene(new Scene(root));
-                stage.setTitle("Login");
-                stage.show();
-                System.out.println("Successfully loaded login page from /FXML/Login.fxml");
-            } else {
-                showError("Could not determine current window");
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            showError("Failed to load Login page: " + e.getMessage());
-            
-            // Debug
-            try {
-                java.net.URL loginUrl = getClass().getResource("/FXML/Login.fxml");
-                System.out.println("Login FXML URL: " + loginUrl);
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
-        }
-    }
-
-    // Get Stage from event (works for MenuItem and Button)
-    private Stage getStageFromEvent(ActionEvent event) {
-        if (event == null) {
-            // Fallback: get any open stage
-            for (Window window : Window.getWindows()) {
-                if (window instanceof Stage && window.isShowing()) {
-                    return (Stage) window;
-                }
-            }
-            return null;
-        }
-        
-        Object source = event.getSource();
-
-        try {
-            if (source instanceof MenuItem) {
-                MenuItem item = (MenuItem) source;
-                return (Stage) item.getParentPopup().getOwnerWindow();
-            } else {
-                return (Stage) ((javafx.scene.Node) source).getScene().getWindow();
-            }
-        } catch (Exception e) {
-            // Fallback: find any open window
-            for (Window w : Window.getWindows()) {
-                if (w instanceof Stage && w.isShowing()) {
-                    return (Stage) w;
-                }
-            }
-            return null;
-        }
-    }
-
-    private void showError(String message) {
-        Alert alert = new Alert(Alert.AlertType.ERROR, message);
-        alert.setHeaderText(null);
-        alert.show();
-    }
-}
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.example.system.controller.TuitionBalanceController" prefHeight="600.0" prefWidth="900.0">
+    <center>
+        <StackPane>
+            <ImageView fitHeight="600.0" fitWidth="900.0" opacity="0.1" preserveRatio="false">
+                <image>
+                    <Image url="/images/sti-logo.png" />
+                </image>
+            </ImageView>
+            <VBox spacing="0">
+                <HBox alignment="CENTER_LEFT" spacing="15.0" style="-fx-background-color: #1e88e5; -fx-padding: 15;">
+                    <children>
+                        <Button text="← Back" onAction="#handleBack" style="-fx-background-color: transparent; -fx-text-fill: white; -fx-cursor: hand; -fx-font-size: 14; -fx-padding: 8 15 8 15;" />
+                        <Label text="Tuition Balance" textFill="white" style="-fx-font-weight: bold;">
+                            <font>
+                                <Font size="24.0" />
+                            </font>
+                        </Label>
+                    </children>
+                </HBox>
+                <VBox spacing="25.0" style="-fx-padding: 40; -fx-background-color: #ecf0f1;" VBox.vgrow="ALWAYS">
+                    <VBox spacing="15.0" style="-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 25;">
+                        <effect>
+                            <DropShadow radius="5" offsetY="2">
+                                <color>
+                                    <Color opacity="0.2" />
+                                </color>
+                            </DropShadow>
+                        </effect>
+                        <Label text="Student Information" style="-fx-font-weight: bold;">
+                            <font>
+                                <Font size="18.0" />
+                            </font>
+                        </Label>
+                        <Separator />
+                        <GridPane hgap="20.0" vgap="10.0">
+                            <columnConstraints>
+                                <ColumnConstraints minWidth="150.0" />
+                                <ColumnConstraints />
+                            </columnConstraints>
+                            <Label text="Student Name:" textFill="#666" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                            <Label fx:id="studentNameLabel" text="John Doe" style="-fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                            <Label text="Student ID:" textFill="#666" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                            <Label fx:id="studentIdLabel" text="2021-000001" style="-fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                            <Label text="Email:" textFill="#666" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                            <Label fx:id="emailLabel" text="john.doe@sti.edu" style="-fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                        </GridPane>
+                    </VBox>
+                    <VBox spacing="15.0" style="-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 25;">
+                        <effect>
+                            <DropShadow radius="5" offsetY="2">
+                                <color>
+                                    <Color opacity="0.2" />
+                                </color>
+                            </DropShadow>
+                        </effect>
+                        <Label text="Balance Summary" style="-fx-font-weight: bold;">
+                            <font>
+                                <Font size="18.0" />
+                            </font>
+                        </Label>
+                        <Separator />
+                        <HBox spacing="50.0">
+                            <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                <Label text="Total Tuition Fee" textFill="#666">
+                                    <font>
+                                        <Font size="13.0" />
+                                    </font>
+                                </Label>
+                                <Label fx:id="totalFeeLabel" text="₱50,000.00" textFill="#333" style="-fx-font-weight: bold;">
+                                    <font>
+                                        <Font size="22.0" />
+                                    </font>
+                                </Label>
+                            </VBox>
+                            <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                <Label text="Amount Paid" textFill="#666">
+                                    <font>
+                                        <Font size="13.0" />
+                                    </font>
+                                </Label>
+                                <Label fx:id="amountPaidLabel" text="₱20,000.00" textFill="#27ae60" style="-fx-font-weight: bold;">
+                                    <font>
+                                        <Font size="22.0" />
+                                    </font>
+                                </Label>
+                            </VBox>
+                            <VBox spacing="8.0" HBox.hgrow="ALWAYS">
+                                <Label text="Remaining Balance" textFill="#666">
+                                    <font>
+                                        <Font size="13.0" />
+                                    </font>
+                                </Label>
+                                <Label fx:id="remainingBalanceLabel" text="₱30,000.00" textFill="#e74c3c" style="-fx-font-weight: bold;">
+                                    <font>
+                                        <Font size="22.0" />
+                                    </font>
+                                </Label>
+                            </VBox>
+                        </HBox>
+                    </VBox>
+                    <VBox spacing="15.0" style="-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 25;">
+                        <effect>
+                            <DropShadow radius="5" offsetY="2">
+                                <color>
+                                    <Color opacity="0.2" />
+                                </color>
+                            </DropShadow>
+                        </effect>
+                        <Label text="Semester Information" style="-fx-font-weight: bold;">
+                            <font>
+                                <Font size="18.0" />
+                            </font>
+                        </Label>
+                        <Separator />
+                        <GridPane hgap="20.0" vgap="10.0">
+                            <columnConstraints>
+                                <ColumnConstraints minWidth="150.0" />
+                                <ColumnConstraints />
+                            </columnConstraints>
+                            <Label text="Semester:" textFill="#666" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                            <Label fx:id="semesterLabel" text="1st Semester" style="-fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                            <Label text="School Year:" textFill="#666" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                            <Label fx:id="schoolYearLabel" text="2024-2025" style="-fx-font-weight: bold;" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                        </GridPane>
+                    </VBox>
+                </VBox>
+            </VBox>
+        </StackPane>
+    </center>
+</BorderPane>

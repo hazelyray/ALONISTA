@@ -25,10 +25,10 @@ import javafx.stage.Window;
 public class HomeController {
 
     @FXML
-    private Label welcomeLabel;
+    private Label welcomeLabel;  // Top right: "Welcome, Student"
 
     @FXML
-    private Label tuitionAmountLabel;
+    private Label tuitionAmountLabel;  // Card showing balance amount
 
     @Autowired
     private SessionManager sessionManager;
@@ -41,7 +41,7 @@ public class HomeController {
 
     @FXML
     public void initialize() {
-        System.out.println("HomeController loaded.");
+        System.out.println("HomeController loaded - Dashboard page");
         loadUserData();
     }
 
@@ -49,37 +49,28 @@ public class HomeController {
         LoginResponse currentUser = sessionManager.getCurrentUser();
         
         if (currentUser != null) {
-            System.out.println("Current user: " + currentUser.getUsername() + " - " + currentUser.getFullName());
+            System.out.println("Loading data for: " + currentUser.getFullName());
             
-            // Update the welcome label
+            // Update welcome label in top bar
             if (welcomeLabel != null) {
                 welcomeLabel.setText("Welcome, " + currentUser.getFullName());
-                System.out.println("Updated welcomeLabel");
             }
 
-            // Load balance data from database
+            // Load balance for the card
             User user = userRepository.findByUsername(currentUser.getUsername()).orElse(null);
-            if (user != null) {
-                System.out.println("Found user in database: " + user.getFullName());
-                
+            if (user != null && user.getStudentBalance() != null) {
                 StudentBalance balance = user.getStudentBalance();
-                if (balance != null) {
-                    System.out.println("Student balance found: ₱" + balance.getRemainingBalance());
-                    
-                    if (tuitionAmountLabel != null) {
-                        String balanceText = "₱" + String.format("%,.2f", balance.getRemainingBalance());
-                        tuitionAmountLabel.setText(balanceText);
-                        System.out.println("Updated tuitionAmountLabel to: " + balanceText);
-                    }
-                } else {
-                    System.out.println("No student balance found for user");
-                    if (tuitionAmountLabel != null) {
-                        tuitionAmountLabel.setText("₱0.00");
-                    }
+                
+                if (tuitionAmountLabel != null) {
+                    String balanceText = "₱" + String.format("%,.2f", balance.getRemainingBalance());
+                    tuitionAmountLabel.setText(balanceText);
+                    System.out.println("Tuition balance: " + balanceText);
+                }
+            } else {
+                if (tuitionAmountLabel != null) {
+                    tuitionAmountLabel.setText("₱0.00");
                 }
             }
-        } else {
-            System.out.println("No user found in session");
         }
     }
 
@@ -93,7 +84,10 @@ public class HomeController {
     @FXML
     public void handleTuitionBalance(ActionEvent event) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/TuitionBalance.fxml"));
+            String projectRoot = System.getProperty("user.dir");
+            java.io.File fxmlFile = new java.io.File(projectRoot + "/src/main/resources/fxml/TuitionBalance.fxml");
+            
+            FXMLLoader loader = new FXMLLoader(fxmlFile.toURI().toURL());
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
 
@@ -102,7 +96,7 @@ public class HomeController {
                 stage.setScene(new Scene(root));
                 stage.setTitle("Tuition Balance");
                 stage.show();
-                System.out.println("Loaded tuition balance page");
+                System.out.println("Navigated to Tuition Balance page");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -112,7 +106,10 @@ public class HomeController {
 
     private void navigateToLogin(ActionEvent event) {
         try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));
+            String projectRoot = System.getProperty("user.dir");
+            java.io.File fxmlFile = new java.io.File(projectRoot + "/src/main/resources/fxml/login.fxml");
+            
+            FXMLLoader loader = new FXMLLoader(fxmlFile.toURI().toURL());
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
 
@@ -121,7 +118,6 @@ public class HomeController {
                 stage.setScene(new Scene(root));
                 stage.setTitle("Login - PaySTI");
                 stage.show();
-                System.out.println("Loaded login page");
             }
         } catch (Exception e) {
             e.printStackTrace();
