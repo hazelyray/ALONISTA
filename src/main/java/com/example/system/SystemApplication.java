@@ -44,7 +44,7 @@ public class SystemApplication extends Application {
         Scene scene = new Scene(root);
         primaryStage.setTitle("Tuition Management System - Login");
         primaryStage.setScene(scene);
-        primaryStage.setResizable(false);
+        primaryStage.setMaximized(true);
         primaryStage.show();
     }
     

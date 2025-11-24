@@ -21,58 +21,52 @@ import javafx.stage.Stage;
 
 @Component
 public class LoginController {
-    
+
     @FXML
     private TextField usernameField;
-    
+
     @FXML
     private PasswordField passwordField;
-    
+
     @FXML
     private TextField passwordVisibleField;
-    
+
     @FXML
     private Button togglePasswordButton;
-    
+
     @FXML
     private Button loginButton;
-    
+
     private boolean isPasswordVisible = false;
-    
+
     @Autowired
     private AuthService authService;
-    
+
     @Autowired
     private SessionManager sessionManager;
-    
+
     @Autowired
     private ApplicationContext springContext;
-    
+
     @FXML
     public void initialize() {
         System.out.println("Login Controller initialized");
-        
-        // Sync password fields - when passwordField changes, update passwordVisibleField
-        passwordField.textProperty().addListener((observable, oldValue, newValue) -> {
-            if (!isPasswordVisible) {
-                passwordVisibleField.setText(newValue);
-            }
+
+        // Sync password fields
+        passwordField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (!isPasswordVisible) passwordVisibleField.setText(newVal);
         });
-        
-        // Sync password fields - when passwordVisibleField changes, update passwordField
-        passwordVisibleField.textProperty().addListener((observable, oldValue, newValue) -> {
-            if (isPasswordVisible) {
-                passwordField.setText(newValue);
-            }
+
+        passwordVisibleField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (isPasswordVisible) passwordField.setText(newVal);
         });
     }
-    
+
     @FXML
     public void togglePasswordVisibility() {
         isPasswordVisible = !isPasswordVisible;
-        
+
         if (isPasswordVisible) {
-            // Show password
             passwordVisibleField.setText(passwordField.getText());
             passwordVisibleField.setVisible(true);
             passwordVisibleField.setManaged(true);
@@ -80,7 +74,6 @@ public class LoginController {
             passwordField.setManaged(false);
             togglePasswordButton.setText("🙈");
         } else {
-            // Hide password
             passwordField.setText(passwordVisibleField.getText());
             passwordField.setVisible(true);
             passwordField.setManaged(true);
@@ -89,85 +82,71 @@ public class LoginController {
             togglePasswordButton.setText("👁");
         }
     }
-    
+
     @FXML
     public void handleMouseEntered() {
-        loginButton.setStyle("-fx-background-color: #1976d2; -fx-text-fill: white; -fx-background-radius: 5; -fx-cursor: hand; -fx-padding: 12;");
+        loginButton.setStyle("-fx-background-color: #1976d2; -fx-text-fill: white; -fx-background-radius: 5; -fx-padding: 12;");
     }
-    
+
     @FXML
     public void handleMouseExited() {
-        loginButton.setStyle("-fx-background-color: #1e88e5; -fx-text-fill: white; -fx-background-radius: 5; -fx-cursor: hand; -fx-padding: 12;");
+        loginButton.setStyle("-fx-background-color: #1e88e5; -fx-text-fill: white; -fx-background-radius: 5; -fx-padding: 12;");
     }
-    
+
     @FXML
     public void handleLogin() {
         String username = usernameField.getText();
-        // Get password from the visible field (whichever is currently shown)
         String password = isPasswordVisible ? passwordVisibleField.getText() : passwordField.getText();
-        
-        // Validate input
+
         if (username.isEmpty() || password.isEmpty()) {
             showAlert(Alert.AlertType.ERROR, "Login Error", "Please enter both username and password");
             return;
         }
-        
+
         try {
-            // Create login request
             LoginRequest loginRequest = new LoginRequest(username, password);
-            
-            // Call the backend authentication service
             LoginResponse response = authService.login(loginRequest);
-            
-            // Save to session
+
             sessionManager.setCurrentUser(response);
-            
+
             System.out.println("Login successful for: " + response.getFullName());
-            
-            // Show success message
-            showAlert(Alert.AlertType.INFORMATION, "Login Successful", 
+            showAlert(Alert.AlertType.INFORMATION, "Login Successful",
                     "Welcome, " + response.getFullName() + "!");
-            
-            // Load homepage
+
             loadHomepage();
-            
+
         } catch (RuntimeException e) {
-            // Show error message
             showAlert(Alert.AlertType.ERROR, "Login Failed", e.getMessage());
         } catch (Exception e) {
             showAlert(Alert.AlertType.ERROR, "Error", "An unexpected error occurred");
             e.printStackTrace();
         }
     }
-    
+
     private void loadHomepage() {
         try {
-            // Get current stage
             Stage stage = (Stage) loginButton.getScene().getWindow();
-            
-            // Load from /FXML/ folder (uppercase)
+            Scene scene = stage.getScene(); // get existing scene
+
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Homepage.fxml"));
             loader.setControllerFactory(springContext::getBean);
-            
-            System.out.println("Loading Homepage from: " + getClass().getResource("/fxml/Homepage.fxml"));
-            
-            Parent root = loader.load();
-            
-            // Set the scene
-            Scene scene = new Scene(root);
-            stage.setScene(scene);
+
+            Parent homepageRoot = loader.load();
+
+            // ⭐ KEY FIX: Replace only the root of the existing scene
+            scene.setRoot(homepageRoot);
+
             stage.setTitle("PaySTI - Home");
-            stage.show();
-            
-            System.out.println("Homepage loaded successfully");
-            
+
+            System.out.println("Homepage loaded without resizing.");
+
         } catch (Exception e) {
             System.err.println("Could not load homepage");
             e.printStackTrace();
             showAlert(Alert.AlertType.ERROR, "Error", "Could not load homepage: " + e.getMessage());
         }
     }
-    
+
     private void showAlert(Alert.AlertType type, String title, String content) {
         Alert alert = new Alert(type);
         alert.setTitle(title);
