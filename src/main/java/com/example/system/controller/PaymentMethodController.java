@@ -1,7 +1,5 @@
 package com.example.system.controller;
 
-import java.io.File;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
@@ -25,26 +23,23 @@ public class PaymentMethodController {
     @FXML
     public void handleBack() {
         try {
-            String projectRoot = System.getProperty("user.dir");
-            String fxmlPath = projectRoot + "/src/main/resources/FXML/TuitionBalance.fxml";
-            
-            File fxmlFile = new File(fxmlPath);
-            if (!fxmlFile.exists()) {
-                System.err.println("TuitionBalance.fxml not found at: " + fxmlPath);
-                return;
-            }
-            
-            FXMLLoader loader = new FXMLLoader(fxmlFile.toURI().toURL());
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/TuitionBalance.fxml"));
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
+
+            Stage stage = (Stage) getCurrentNode().getScene().getWindow();
+            // ⭐ FIX: Preserve window state
+            boolean wasMaximized = stage.isMaximized();
+            Scene currentScene = stage.getScene();
+            currentScene.setRoot(root);
             
-            // Get the current stage properly
-            Stage stage = getCurrentStage();
-            stage.setScene(new Scene(root));
             stage.setTitle("Tuition Balance");
-            stage.show();
+            // ⭐ Restore the previous window state
+            if (wasMaximized) {
+                stage.setMaximized(true);
+            }
             
-            System.out.println("Navigated back to Tuition Balance");
+            System.out.println("Navigated back to Tuition Balance (preserved window state)");
         } catch (Exception e) {
             System.err.println("Could not load tuition balance screen");
             e.printStackTrace();
@@ -63,33 +58,51 @@ public class PaymentMethodController {
 
     private void loadPaymentScreen(String fxmlFile, String title) {
         try {
-            String projectRoot = System.getProperty("user.dir");
-            String fxmlPath = projectRoot + "/src/main/resources/FXML/" + fxmlFile;
-            
-            File fxmlFileObj = new File(fxmlPath);
-            if (!fxmlFileObj.exists()) {
-                System.err.println(fxmlFile + " not found at: " + fxmlPath);
-                // Create a simple placeholder screen if the specific payment screen doesn't exist
-                createPlaceholderPaymentScreen(title);
-                return;
-            }
-            
-            FXMLLoader loader = new FXMLLoader(fxmlFileObj.toURI().toURL());
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/" + fxmlFile));
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
+
+            Stage stage = (Stage) getCurrentNode().getScene().getWindow();
+            // ⭐ FIX: Preserve window state
+            boolean wasMaximized = stage.isMaximized();
+            Scene currentScene = stage.getScene();
+            currentScene.setRoot(root);
             
-            Stage stage = getCurrentStage();
-            stage.setScene(new Scene(root));
             stage.setTitle(title);
-            stage.show();
+            // ⭐ Restore the previous window state
+            if (wasMaximized) {
+                stage.setMaximized(true);
+            }
             
-            System.out.println("Navigated to " + title);
+            System.out.println("Navigated to " + title + " (preserved window state)");
         } catch (Exception e) {
             System.err.println("Could not load " + fxmlFile);
             e.printStackTrace();
+            // Fallback to placeholder if specific payment screen doesn't exist
+            createPlaceholderPaymentScreen(title);
         }
     }
 
+    // Add this helper method to get a node from the current scene
+    private javafx.scene.Node getCurrentNode() {
+        // Get the first window that's showing
+        Window window = javafx.stage.Stage.getWindows().stream()
+            .filter(Window::isShowing)
+            .findFirst()
+            .orElse(null);
+        
+        if (window instanceof Stage) {
+            Scene scene = ((Stage) window).getScene();
+            if (scene != null && scene.getRoot() != null) {
+                return scene.getRoot();
+            }
+        }
+        
+        // Fallback - this should rarely happen
+        return new Label(); // dummy node
+    }
+
+    // Also update the createPlaceholderPaymentScreen method:
     private void createPlaceholderPaymentScreen(String paymentMethod) {
         try {
             // Create a simple placeholder screen
@@ -111,23 +124,18 @@ public class PaymentMethodController {
             
             root.getChildren().addAll(titleLabel, messageLabel, backButton);
             
-            Stage stage = getCurrentStage();
-            stage.setScene(new Scene(root, 900, 600));
+            Stage stage = (Stage) getCurrentNode().getScene().getWindow();
+            boolean wasMaximized = stage.isMaximized();
+            Scene currentScene = stage.getScene();
+            currentScene.setRoot(root);
+            
             stage.setTitle(paymentMethod);
-            stage.show();
+            if (wasMaximized) {
+                stage.setMaximized(true);
+            }
             
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    // Helper method to get the current stage
-    private Stage getCurrentStage() {
-        // This is a placeholder - in a real FXML controller, you'd get the stage from a node
-        // For now, we'll return the primary stage
-        return (Stage) javafx.stage.Stage.getWindows().stream()
-            .filter(Window::isShowing)
-            .findFirst()
-            .orElse(null);
     }
 }

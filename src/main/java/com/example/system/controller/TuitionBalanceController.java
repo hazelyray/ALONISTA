@@ -1,6 +1,5 @@
 package com.example.system.controller;
 
-import java.io.File;
 import java.net.URL;
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -161,25 +160,23 @@ public class TuitionBalanceController implements Initializable {
     @FXML
     public void handleBack() {
         try {
-            String projectRoot = System.getProperty("user.dir");
-            String fxmlPath = projectRoot + "/src/main/resources/FXML/Homepage.fxml";
-            
-            File fxmlFile = new File(fxmlPath);
-            if (!fxmlFile.exists()) {
-                System.err.println("Homepage.fxml not found at: " + fxmlPath);
-                return;
-            }
-            
-            FXMLLoader loader = new FXMLLoader(fxmlFile.toURI().toURL());
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Homepage.fxml"));
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
-            
+
             Stage stage = (Stage) studentNameLabel.getScene().getWindow();
-            stage.setScene(new Scene(root));
-            stage.setTitle("PaySTI - Home");
-            stage.show();
+            // ⭐ FIX: Preserve window state
+            boolean wasMaximized = stage.isMaximized();
+            Scene currentScene = stage.getScene();
+            currentScene.setRoot(root);
             
-            System.out.println("Navigated back to Homepage");
+            stage.setTitle("PaySTI - Home");
+            // ⭐ Restore the previous window state
+            if (wasMaximized) {
+                stage.setMaximized(true);
+            }
+            
+            System.out.println("Navigated back to Homepage (preserved window state)");
         } catch (Exception e) {
             System.err.println("Could not load homepage");
             e.printStackTrace();
@@ -189,25 +186,23 @@ public class TuitionBalanceController implements Initializable {
     @FXML
     public void handleMakePayment() {
         try {
-            String projectRoot = System.getProperty("user.dir");
-            String fxmlPath = projectRoot + "/src/main/resources/FXML/PaymentMethod.fxml";
-            
-            File fxmlFile = new File(fxmlPath);
-            if (!fxmlFile.exists()) {
-                System.err.println("PaymentMethod.fxml not found at: " + fxmlPath);
-                return;
-            }
-            
-            FXMLLoader loader = new FXMLLoader(fxmlFile.toURI().toURL());
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/PaymentMethod.fxml"));
             loader.setControllerFactory(springContext::getBean);
             Parent root = loader.load();
-            
+
             Stage stage = (Stage) studentNameLabel.getScene().getWindow();
-            stage.setScene(new Scene(root));
-            stage.setTitle("Choose Payment Method");
-            stage.show();
+            // ⭐ FIX: Preserve window state
+            boolean wasMaximized = stage.isMaximized();
+            Scene currentScene = stage.getScene();
+            currentScene.setRoot(root);
             
-            System.out.println("Navigated to Payment Method selection");
+            stage.setTitle("Choose Payment Method");
+            // ⭐ Restore the previous window state
+            if (wasMaximized) {
+                stage.setMaximized(true);
+            }
+            
+            System.out.println("Navigated to Payment Method selection (preserved window state)");
         } catch (Exception e) {
             System.err.println("Could not load payment method screen");
             e.printStackTrace();

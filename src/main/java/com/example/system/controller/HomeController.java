@@ -90,10 +90,18 @@ public class HomeController {
 
             Stage stage = getStageFromEvent(event);
             if (stage != null) {
-                stage.setScene(new Scene(root));
+                // ⭐ FIX: Preserve window state instead of forcing maximized
+                boolean wasMaximized = stage.isMaximized();
+                Scene currentScene = stage.getScene();
+                currentScene.setRoot(root);
+                
                 stage.setTitle("Tuition Balance");
-                stage.show();
-                System.out.println("Navigated to Tuition Balance page");
+                // ⭐ Restore the previous window state
+                if (wasMaximized) {
+                    stage.setMaximized(true);
+                }
+                
+                System.out.println("Navigated to Tuition Balance page (preserved window state)");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -109,9 +117,14 @@ public class HomeController {
 
             Stage stage = getStageFromEvent(event);
             if (stage != null) {
-                stage.setScene(new Scene(root));
+                boolean wasMaximized = stage.isMaximized();
+                Scene currentScene = stage.getScene();
+                currentScene.setRoot(root);
+                
                 stage.setTitle("Login - PaySTI");
-                stage.show();
+                if (wasMaximized) {
+                    stage.setMaximized(true);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
