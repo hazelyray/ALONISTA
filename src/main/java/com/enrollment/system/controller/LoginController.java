@@ -113,7 +113,7 @@ public class LoginController {
     private void loadDashboard(LoginResponse response) {
         try {
             // Load Dashboard FXML
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/Dashboard.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Dashboard.fxml"));
             loader.setControllerFactory(applicationContext::getBean);
             Parent dashboardRoot = loader.load();
             

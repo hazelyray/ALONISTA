@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" 
+            xmlns:fx="http://javafx.com/fxml/1" 
+            fx:controller="com.enrollment.system.controller.SectionsManagementController"
+            style="-fx-background-color: #ecf0f1;">
+    
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="15" style="-fx-padding: 20;">
+            <Label text="Strands &amp; Sections Management" 
+                   style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="refreshButton" text="Refresh" onAction="#handleRefresh" 
+                    style="-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 13px; -fx-background-radius: 5; -fx-padding: 8 20; -fx-cursor: hand;"/>
+        </HBox>
+    </top>
+    
+    <center>
+        <HBox spacing="20" style="-fx-padding: 0 20 20 20;">
+            <!-- Left Side: Strands -->
+            <VBox spacing="15" prefWidth="500" style="-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);">
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Strands" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="addStrandButton" text="Add Strand" onAction="#handleAddStrand" 
+                            style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 12px; -fx-background-radius: 5; -fx-padding: 6 15; -fx-cursor: hand;"/>
+                </HBox>
+                
+                <Label fx:id="strandCountLabel" text="Total Strands: 0" 
+                       style="-fx-font-size: 12px; -fx-text-fill: #7f8c8d;"/>
+                
+                <TableView fx:id="strandsTable" style="-fx-background-color: white;" VBox.vgrow="ALWAYS">
+                    <placeholder>
+                        <Label text="No strands found." 
+                               style="-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-padding: 20;" 
+                               alignment="CENTER"/>
+                    </placeholder>
+                    <columns>
+                        <TableColumn fx:id="strandIdColumn" text="ID" prefWidth="50" minWidth="50" maxWidth="50" visible="false"/>
+                        <TableColumn fx:id="strandNameColumn" text="Name" prefWidth="150"/>
+                        <TableColumn fx:id="strandDescriptionColumn" text="Description" prefWidth="200"/>
+                        <TableColumn fx:id="strandActionsColumn" text="Actions" prefWidth="100" resizable="false"/>
+                    </columns>
+                </TableView>
+            </VBox>
+            
+            <!-- Right Side: Sections -->
+            <VBox spacing="15" HBox.hgrow="ALWAYS" style="-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);">
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Sections" style="-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="addSectionButton" text="Add Section" onAction="#handleAddSection" 
+                            style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 12px; -fx-background-radius: 5; -fx-padding: 6 15; -fx-cursor: hand;"/>
+                </HBox>
+                
+                <Label fx:id="sectionCountLabel" text="Total Sections: 0" 
+                       style="-fx-font-size: 12px; -fx-text-fill: #7f8c8d;"/>
+                
+                <TableView fx:id="sectionsTable" style="-fx-background-color: white;" VBox.vgrow="ALWAYS">
+                    <placeholder>
+                        <Label text="No sections found." 
+                               style="-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-padding: 20;" 
+                               alignment="CENTER"/>
+                    </placeholder>
+                    <columns>
+                        <TableColumn fx:id="sectionIdColumn" text="ID" prefWidth="50" minWidth="50" maxWidth="50" visible="false"/>
+                        <TableColumn fx:id="sectionNameColumn" text="Section Name" prefWidth="150"/>
+                        <TableColumn fx:id="sectionStrandColumn" text="Strand" prefWidth="100"/>
+                        <TableColumn fx:id="sectionGradeLevelColumn" text="Grade Level" prefWidth="100"/>
+                        <TableColumn fx:id="sectionCapacityColumn" text="Capacity" prefWidth="100"/>
+                        <TableColumn fx:id="sectionActionsColumn" text="Actions" prefWidth="150" resizable="false"/>
+                    </columns>
+                </TableView>
+            </VBox>
+        </HBox>
+    </center>
+    
+</BorderPane>

@@ -1,74 +1,83 @@
-package com.enrollment.system.dto;
+package com.enrollment.system.model;
 
-import com.enrollment.system.model.Student;
+import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-public class StudentDto {
+@Entity
+@Table(name = "students")
+public class Student {
     
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
+    
+    @Column(nullable = false, length = 100)
     private String name;
+    
+    @Column(name = "birthdate")
     private LocalDate birthdate;
+    
+    @Column(name = "age")
     private Integer age;
+    
+    @Column(name = "sex", length = 10)
     private String sex;
+    
+    @Column(name = "address", length = 255)
     private String address;
+    
+    @Column(name = "contact_number", length = 20)
     private String contactNumber;
+    
+    @Column(name = "parent_guardian_name", length = 100)
     private String parentGuardianName;
+    
+    @Column(name = "parent_guardian_contact", length = 20)
     private String parentGuardianContact;
+    
+    @Column(name = "parent_guardian_relationship", length = 50)
     private String parentGuardianRelationship;
+    
+    @Column(name = "grade_level")
     private Integer gradeLevel;
+    
+    @Column(name = "strand", length = 50)
     private String strand;
-    private Long sectionId;
-    private String sectionName;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "section_id")
+    private Section section;
+    
+    @Column(name = "previous_school", length = 200)
     private String previousSchool;
+    
+    @Column(name = "gwa")
     private Double gwa;
+    
+    @Column(name = "lrn", length = 20)
     private String lrn;
+    
+    @Column(name = "enrollment_status", length = 50)
     private String enrollmentStatus;
+    
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+    
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-    private Boolean isArchived;
+    
+    @Column(name = "is_archived")
+    private Boolean isArchived = false;
+    
+    @Column(name = "archive_reason", length = 100)
     private String archiveReason;
+    
+    @Column(name = "archived_at")
     private LocalDateTime archivedAt;
     
     // Constructors
-    public StudentDto() {
-    }
-    
-    // Static factory method
-    public static StudentDto fromStudent(Student student) {
-        StudentDto dto = new StudentDto();
-        dto.setId(student.getId());
-        dto.setName(student.getName());
-        dto.setBirthdate(student.getBirthdate());
-        dto.setAge(student.getAge());
-        dto.setSex(student.getSex());
-        dto.setAddress(student.getAddress());
-        dto.setContactNumber(student.getContactNumber());
-        dto.setParentGuardianName(student.getParentGuardianName());
-        dto.setParentGuardianContact(student.getParentGuardianContact());
-        dto.setParentGuardianRelationship(student.getParentGuardianRelationship());
-        dto.setGradeLevel(student.getGradeLevel());
-        dto.setStrand(student.getStrand());
-        try {
-            if (student.getSection() != null) {
-                dto.setSectionId(student.getSection().getId());
-                dto.setSectionName(student.getSection().getName());
-            }
-        } catch (Exception e) {
-            // Handle lazy loading exception - section not loaded
-            dto.setSectionId(null);
-            dto.setSectionName(null);
-        }
-        dto.setPreviousSchool(student.getPreviousSchool());
-        dto.setGwa(student.getGwa());
-        dto.setLrn(student.getLrn());
-        dto.setEnrollmentStatus(student.getEnrollmentStatus());
-        dto.setCreatedAt(student.getCreatedAt());
-        dto.setUpdatedAt(student.getUpdatedAt());
-        dto.setIsArchived(student.getIsArchived());
-        dto.setArchiveReason(student.getArchiveReason());
-        dto.setArchivedAt(student.getArchivedAt());
-        return dto;
+    public Student() {
     }
     
     // Getters and Setters
@@ -168,20 +177,12 @@ public class StudentDto {
         this.strand = strand;
     }
     
-    public Long getSectionId() {
-        return sectionId;
+    public Section getSection() {
+        return section;
     }
     
-    public void setSectionId(Long sectionId) {
-        this.sectionId = sectionId;
-    }
-    
-    public String getSectionName() {
-        return sectionName;
-    }
-    
-    public void setSectionName(String sectionName) {
-        this.sectionName = sectionName;
+    public void setSection(Section section) {
+        this.section = section;
     }
     
     public String getPreviousSchool() {
@@ -255,4 +256,17 @@ public class StudentDto {
     public void setArchivedAt(LocalDateTime archivedAt) {
         this.archivedAt = archivedAt;
     }
+    
+    // JPA Lifecycle callbacks
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+    
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
+
