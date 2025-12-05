@@ -1,9 +1,11 @@
 package com.enrollment.system.config;
 
+import com.enrollment.system.model.SchoolYear;
 import com.enrollment.system.model.Section;
 import com.enrollment.system.model.Student;
 import com.enrollment.system.model.Strand;
 import com.enrollment.system.model.User;
+import com.enrollment.system.repository.SchoolYearRepository;
 import com.enrollment.system.repository.SectionRepository;
 import com.enrollment.system.repository.StudentRepository;
 import com.enrollment.system.repository.StrandRepository;
@@ -33,6 +35,9 @@ public class DataInitializer implements CommandLineRunner {
     
     @Autowired
     private StrandRepository strandRepository;
+    
+    @Autowired(required = false)
+    private SchoolYearRepository schoolYearRepository;
     
     @Override
     public void run(String... args) throws Exception {
@@ -64,7 +69,15 @@ public class DataInitializer implements CommandLineRunner {
             System.out.println("✓ Default registrar user created - Username: registrar, Password: registrar123");
         }
         
-        // Initialize strands first
+        // Initialize school years first (before students)
+        try {
+            initializeSchoolYears();
+        } catch (Exception e) {
+            System.err.println("⚠ Warning: Failed to initialize school years: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        // Initialize strands
         try {
             initializeStrands();
         } catch (Exception e) {
@@ -92,6 +105,63 @@ public class DataInitializer implements CommandLineRunner {
         System.out.println("Seguinon Stand Alone Senior High School");
         System.out.println("Enrollment System Started Successfully");
         System.out.println("=".repeat(60));
+    }
+    
+    private void initializeSchoolYears() {
+        if (schoolYearRepository == null) {
+            System.out.println("⚠ SchoolYearRepository not available - skipping school year initialization");
+            return;
+        }
+        
+        // Create 2025-2026 school year if it doesn't exist (set as current)
+        SchoolYear sy2025 = schoolYearRepository.findByYear("2025-2026").orElse(null);
+        if (sy2025 == null) {
+            sy2025 = new SchoolYear();
+            sy2025.setYear("2025-2026");
+            sy2025.setStartDate(LocalDate.of(2025, 6, 1));
+            sy2025.setEndDate(LocalDate.of(2026, 3, 31));
+            sy2025.setIsCurrent(true); // Set as current
+            schoolYearRepository.save(sy2025);
+            System.out.println("✓ Created school year 2025-2026 and set as current");
+        } else if (!Boolean.TRUE.equals(sy2025.getIsCurrent())) {
+            // If it exists but is not current, make it current
+            // First unset any other current school year
+            java.util.List<SchoolYear> allCurrent = schoolYearRepository.findAll().stream()
+                .filter(sy -> Boolean.TRUE.equals(sy.getIsCurrent()))
+                .collect(java.util.stream.Collectors.toList());
+            for (SchoolYear sy : allCurrent) {
+                sy.setIsCurrent(false);
+                schoolYearRepository.save(sy);
+            }
+            sy2025.setIsCurrent(true);
+            schoolYearRepository.save(sy2025);
+            System.out.println("✓ Set school year 2025-2026 as current");
+        }
+        
+        // Create 2026-2027 school year if it doesn't exist
+        SchoolYear sy2026 = schoolYearRepository.findByYear("2026-2027").orElse(null);
+        if (sy2026 == null) {
+            sy2026 = new SchoolYear();
+            sy2026.setYear("2026-2027");
+            sy2026.setStartDate(LocalDate.of(2026, 6, 1));
+            sy2026.setEndDate(LocalDate.of(2027, 3, 31));
+            sy2026.setIsCurrent(false); // Not current initially
+            schoolYearRepository.save(sy2026);
+            System.out.println("✓ Created school year 2026-2027");
+        }
+        
+        // Assign all existing students without school year to 2025-2026 (current)
+        java.util.List<Student> studentsWithoutYear = studentRepository.findAll().stream()
+            .filter(s -> s.getSchoolYear() == null)
+            .collect(java.util.stream.Collectors.toList());
+        
+        if (!studentsWithoutYear.isEmpty()) {
+            for (Student student : studentsWithoutYear) {
+                student.setSchoolYear(sy2025);
+            }
+            studentRepository.saveAll(studentsWithoutYear);
+            System.out.println("✓ Assigned " + studentsWithoutYear.size() + " existing students to school year 2025-2026");
+        }
     }
     
     private void initializeStrands() {
@@ -323,6 +393,14 @@ public class DataInitializer implements CommandLineRunner {
                 
                 // Ensure not archived
                 student.setIsArchived(false);
+                
+                // Assign to current school year (2024-2025 by default)
+                if (schoolYearRepository != null) {
+                    SchoolYear currentSchoolYear = schoolYearRepository.findByIsCurrentTrue().orElse(null);
+                    if (currentSchoolYear != null) {
+                        student.setSchoolYear(currentSchoolYear);
+                    }
+                }
                 
                 studentRepository.save(student);
                 successCount++;

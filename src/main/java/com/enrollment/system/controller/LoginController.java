@@ -115,11 +115,15 @@ public class LoginController {
             // Load Dashboard FXML
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Dashboard.fxml"));
             loader.setControllerFactory(applicationContext::getBean);
+            
+            // Load the FXML - this will call initialize()
             Parent dashboardRoot = loader.load();
             
             // Get dashboard controller and set user session
             DashboardController dashboardController = loader.getController();
-            dashboardController.setUserSession(response.getUser(), response.getSessionToken());
+            if (dashboardController != null) {
+                dashboardController.setUserSession(response.getUser(), response.getSessionToken());
+            }
             
             // Create new stage for dashboard
             Stage dashboardStage = new Stage();
@@ -137,6 +141,12 @@ public class LoginController {
         } catch (Exception e) {
             e.printStackTrace();
             showError("Error loading dashboard: " + e.getMessage());
+            // Show full stack trace for debugging
+            Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+            errorAlert.setTitle("Dashboard Loading Error");
+            errorAlert.setHeaderText("Failed to load dashboard");
+            errorAlert.setContentText("Error: " + e.getMessage() + "\n\nCheck console for details.");
+            errorAlert.showAndWait();
         }
     }
     

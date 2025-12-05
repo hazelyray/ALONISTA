@@ -27,70 +27,91 @@
     
     <!-- Left Sidebar -->
     <left>
-        <VBox spacing="5" style="-fx-background-color: #34495e; -fx-padding: 20 0;" prefWidth="250">
-            <Label text="MENU" style="-fx-text-fill: #95a5a6; -fx-font-size: 12px; -fx-font-weight: bold; -fx-padding: 10 20 5 20;"/>
+        <VBox spacing="8" style="-fx-background-color: #2c3e50; -fx-padding: 0;" prefWidth="280">
+            <!-- Logo/Header Section -->
+            <VBox alignment="CENTER" spacing="5" style="-fx-padding: 25 15 30 15; -fx-background-color: #1a252f;">
+                <Label text="📚" style="-fx-font-size: 36px;"/>
+                <Label text="Seguinon SASHS" style="-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;"/>
+                <Label text="Enrollment System" style="-fx-text-fill: #95a5a6; -fx-font-size: 12px;"/>
+            </VBox>
             
-            <Button fx:id="btnDashboard" text="Dashboard" onAction="#showDashboard"
-                    style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230;"/>
+            <!-- Menu Section -->
+            <VBox spacing="3" style="-fx-padding: 0 15;">
+                <Label text="MAIN MENU" style="-fx-text-fill: #7f8c8d; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 15 15 10 15;"/>
+                
+                <Button fx:id="btnDashboard" text="  📊 Dashboard" onAction="#showDashboard"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
             
             <!-- Student Management - Expandable Menu -->
-            <VBox spacing="0">
-                <HBox alignment="CENTER_LEFT" spacing="5">
-                    <Button fx:id="btnStudentManagement" text="Student Management ▼" 
-                            onAction="#toggleStudentManagement"
-                            style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230; -fx-content-display: left;"/>
-                </HBox>
+            <VBox spacing="2">
+                <Button fx:id="btnStudentManagement" text="  👥 Student Management" 
+                        onAction="#toggleStudentManagement"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
                 
                 <!-- Submenu Items -->
-                <VBox fx:id="studentManagementSubmenu" spacing="0" style="-fx-padding: 0 0 0 20;" visible="false" managed="false">
-                    <Button fx:id="btnAddStudent" text="Add Student" onAction="#showAddStudent"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
-                    <Button fx:id="btnViewStudents" text="View Students" onAction="#showViewStudents"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
+                <VBox fx:id="studentManagementSubmenu" spacing="2" style="-fx-padding: 5 0 5 25;" visible="false" managed="false">
+                    <Button fx:id="btnAddStudent" text="  ➕ Add Student" onAction="#showAddStudent"
+                            style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
+                    <Button fx:id="btnViewStudents" text="  👀 View Students" onAction="#showViewStudents"
+                            style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
                 </VBox>
             </VBox>
             
-            <Button fx:id="btnStrandAndSection" text="Strand and Section" onAction="#showStrandAndSection"
-                    style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230;"/>
+            <Button fx:id="btnStrandAndSection" text="  📋 Strand and Section" onAction="#showStrandAndSection"
+                    style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
             
             <!-- Reports - Expandable Menu -->
-            <VBox spacing="0">
-                <HBox alignment="CENTER_LEFT" spacing="5">
-                    <Button fx:id="btnReports" text="Reports ▼" 
-                            onAction="#toggleReports"
-                            style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230; -fx-content-display: left;"/>
-                </HBox>
+            <VBox spacing="2">
+                <Button fx:id="btnReports" text="  📈 Reports" 
+                        onAction="#toggleReports"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
                 
                 <!-- Submenu Items -->
-                <VBox fx:id="reportsSubmenu" spacing="0" style="-fx-padding: 0 0 0 20;" visible="false" managed="false">
-                    <Button fx:id="btnByGradeLevel" text="By Grade Level" onAction="#showByGradeLevel"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
-                    <Button fx:id="btnByStrand" text="By Strand" onAction="#showByStrand"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
-                    <Button fx:id="btnEnrollmentSummary" text="Enrollment Summary" onAction="#showEnrollmentSummary"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
-                    <Button fx:id="btnArchiveStudents" text="Archive Students" onAction="#showArchiveStudents"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
+                <VBox fx:id="reportsSubmenu" spacing="2" style="-fx-padding: 5 0 5 25;" visible="false" managed="false">
+                    <Button fx:id="btnByGradeLevel" text="  📈 By Grade Level" onAction="#showByGradeLevel"
+                            style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
+                    <Button fx:id="btnByStrand" text="  🎯 By Strand" onAction="#showByStrand"
+                            style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
+                    <Button fx:id="btnEnrollmentSummary" text="  📑 Enrollment Summary" onAction="#showEnrollmentSummary"
+                            style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
+                    <Button fx:id="btnArchiveStudents" text="  📦 Archive Students" onAction="#showArchiveStudents"
+                            style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
                 </VBox>
             </VBox>
             
-            <!-- Admin Settings - Expandable Menu -->
-            <VBox fx:id="adminSection" spacing="0">
-                <HBox alignment="CENTER_LEFT" spacing="5">
-                    <Button fx:id="btnAdminSettings" text="Admin Settings ▼" 
-                            onAction="#toggleAdminSettings"
-                            style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230; -fx-content-display: left;"/>
-                </HBox>
+            <!-- Settings - Expandable Menu -->
+            <VBox fx:id="adminSection" spacing="2">
+                <Button fx:id="btnSettings" text="  🔧 SETTINGS" 
+                        onAction="#toggleSettings"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
                 
                 <!-- Submenu Items -->
-                <VBox fx:id="adminSettingsSubmenu" spacing="0" style="-fx-padding: 0 0 0 20;" visible="false" managed="false">
-                    <Button fx:id="btnProfile" text="Profile" onAction="#showProfile"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
-                    <Button fx:id="btnChangePassword" text="Change Password" onAction="#showChangePassword"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
-                    <Button fx:id="btnSystemSettings" text="System Settings" onAction="#showSystemSettings"
-                            style="-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;"/>
+                <VBox fx:id="settingsSubmenu" spacing="2" style="-fx-padding: 5 0 5 25;" visible="false" managed="false">
+                    <!-- User Accounts - Expandable Submenu -->
+                    <VBox spacing="2">
+                        <Button fx:id="btnUserAccounts" text="  👥 User Accounts" 
+                                onAction="#toggleUserAccounts"
+                                style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
+                        
+                        <!-- User Accounts Submenu Items -->
+                        <VBox fx:id="userAccountsSubmenu" spacing="2" style="-fx-padding: 5 0 5 25;" visible="false" managed="false">
+                            <Button fx:id="btnProfile" text="  👤 Profile" onAction="#showProfile"
+                                    style="-fx-background-color: #2c3e50; -fx-text-fill: #ecf0f1; -fx-font-size: 12px; -fx-padding: 10 16; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 200;"/>
+                        </VBox>
+                    </VBox>
+                    
+                    <Button fx:id="btnSchoolYearManagement" text="  📅 School Year Management" onAction="#showSchoolYearManagement"
+                            style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
                 </VBox>
+            </VBox>
+            </VBox>
+            
+            <!-- Spacer -->
+            <Region VBox.vgrow="ALWAYS"/>
+            
+            <!-- Footer -->
+            <VBox alignment="CENTER" spacing="5" style="-fx-padding: 20 15; -fx-background-color: #1a252f;">
+                <Label text="Version 1.0" style="-fx-text-fill: #7f8c8d; -fx-font-size: 10px;"/>
             </VBox>
         </VBox>
     </left>

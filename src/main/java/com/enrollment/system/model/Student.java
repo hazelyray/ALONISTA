@@ -49,6 +49,10 @@ public class Student {
     @JoinColumn(name = "section_id")
     private Section section;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "school_year_id")
+    private SchoolYear schoolYear;
+    
     @Column(name = "previous_school", length = 200)
     private String previousSchool;
     
@@ -75,6 +79,9 @@ public class Student {
     
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
+    
+    @Column(name = "re_enrollment_reason", length = 255)
+    private String reEnrollmentReason;
     
     // Constructors
     public Student() {
@@ -185,6 +192,14 @@ public class Student {
         this.section = section;
     }
     
+    public SchoolYear getSchoolYear() {
+        return schoolYear;
+    }
+    
+    public void setSchoolYear(SchoolYear schoolYear) {
+        this.schoolYear = schoolYear;
+    }
+    
     public String getPreviousSchool() {
         return previousSchool;
     }
@@ -255,6 +270,14 @@ public class Student {
     
     public void setArchivedAt(LocalDateTime archivedAt) {
         this.archivedAt = archivedAt;
+    }
+    
+    public String getReEnrollmentReason() {
+        return reEnrollmentReason;
+    }
+    
+    public void setReEnrollmentReason(String reEnrollmentReason) {
+        this.reEnrollmentReason = reEnrollmentReason;
     }
     
     // JPA Lifecycle callbacks

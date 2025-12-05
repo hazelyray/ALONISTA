@@ -3,16 +3,26 @@ package com.enrollment.system.controller;
 import com.enrollment.system.dto.StudentDto;
 import com.enrollment.system.model.Section;
 import com.enrollment.system.model.Strand;
+import com.enrollment.system.model.Student;
 import com.enrollment.system.service.SectionService;
 import com.enrollment.system.service.StrandService;
 import com.enrollment.system.service.StudentService;
+import com.enrollment.system.service.SchoolYearService;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class AddStudentController {
@@ -74,6 +84,76 @@ public class AddStudentController {
     @FXML
     private Button cancelButton;
     
+    // New UI elements for choice screen and re-enrollment
+    @FXML
+    private VBox choiceScreen;
+    
+    @FXML
+    private VBox studentSelectionScreen;
+    
+    @FXML
+    private VBox formContainer;
+    
+    @FXML
+    private Button btnAddNewStudent;
+    
+    @FXML
+    private Button btnReEnrollStudent;
+    
+    @FXML
+    private TableView<StudentDto> studentSelectionTable;
+    
+    @FXML
+    private TableColumn<StudentDto, String> selectNameColumn;
+    
+    @FXML
+    private TableColumn<StudentDto, Integer> selectGradeColumn;
+    
+    @FXML
+    private TableColumn<StudentDto, String> selectStrandColumn;
+    
+    @FXML
+    private TableColumn<StudentDto, String> selectSectionColumn;
+    
+    @FXML
+    private Button btnCancelSelection;
+    
+    @FXML
+    private Button btnSelectStudent;
+    
+    @FXML
+    private TextField searchField;
+    
+    @FXML
+    private Button btnClearSearch;
+    
+    @FXML
+    private ComboBox<Integer> filterGradeCombo;
+    
+    @FXML
+    private ComboBox<String> filterStrandCombo;
+    
+    @FXML
+    private ComboBox<String> filterSectionCombo;
+    
+    @FXML
+    private Button btnClearFilters;
+    
+    @FXML
+    private Label resultsCountLabel;
+    
+    @FXML
+    private Label formTitleLabel;
+    
+    @FXML
+    private Label modeIndicatorLabel;
+    
+    @FXML
+    private VBox reEnrollmentReasonSection;
+    
+    @FXML
+    private TextArea reEnrollmentReasonField;
+    
     @Autowired
     private StudentService studentService;
     
@@ -83,16 +163,68 @@ public class AddStudentController {
     @Autowired
     private StrandService strandService;
     
+    @Autowired(required = false)
+    private SchoolYearService schoolYearService;
+    
+    @Autowired(required = false)
+    private com.enrollment.system.repository.StudentRepository studentRepository;
+    
+    // Mode tracking
+    private enum Mode { NEW_STUDENT, RE_ENROLL }
+    private Mode currentMode = Mode.NEW_STUDENT;
+    private StudentDto selectedStudentForReEnrollment = null;
+    private ObservableList<StudentDto> eligibleStudentsList;
+    private FilteredList<StudentDto> filteredStudentsList;
+    
     @FXML
     public void initialize() {
+        // Show choice screen initially, hide form and selection screen
+        if (choiceScreen != null) {
+            choiceScreen.setVisible(true);
+            choiceScreen.setManaged(true);
+        }
+        if (formContainer != null) {
+            formContainer.setVisible(false);
+            formContainer.setManaged(false);
+        }
+        if (studentSelectionScreen != null) {
+            studentSelectionScreen.setVisible(false);
+            studentSelectionScreen.setManaged(false);
+        }
+        
+        // Initialize student selection table
+        if (studentSelectionTable != null && selectNameColumn != null) {
+            selectNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+            selectGradeColumn.setCellValueFactory(new PropertyValueFactory<>("gradeLevel"));
+            selectStrandColumn.setCellValueFactory(new PropertyValueFactory<>("strand"));
+            if (selectSectionColumn != null) {
+                selectSectionColumn.setCellValueFactory(new PropertyValueFactory<>("sectionName"));
+            }
+            studentSelectionTable.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+        }
+        
+        // Initialize filter combo boxes
+        if (filterGradeCombo != null) {
+            filterGradeCombo.getItems().addAll(null, 11, 12);
+        }
+        
+        // Setup search and filter listeners
+        setupSearchAndFilters();
+        
         // Initialize Sex ComboBox
-        sexComboBox.getItems().addAll("Male", "Female");
+        if (sexComboBox != null) {
+            sexComboBox.getItems().addAll("Male", "Female");
+        }
         
         // Initialize Parent/Guardian Relationship ComboBox
-        parentGuardianRelationshipComboBox.getItems().addAll("Father", "Mother", "Guardian", "Other");
+        if (parentGuardianRelationshipComboBox != null) {
+            parentGuardianRelationshipComboBox.getItems().addAll("Father", "Mother", "Guardian", "Other");
+        }
         
         // Initialize Grade Level ComboBox
-        gradeLevelComboBox.getItems().addAll(11, 12);
+        if (gradeLevelComboBox != null) {
+            gradeLevelComboBox.getItems().addAll(11, 12);
+        }
         
         // Initialize Strand ComboBox - Load active strands from service
         loadActiveStrands();
@@ -582,6 +714,27 @@ public class AddStudentController {
             return;
         }
         
+        // Additional validation for re-enrollment mode
+        if (currentMode == Mode.RE_ENROLL && selectedStudentForReEnrollment != null) {
+            Integer currentGrade = selectedStudentForReEnrollment.getGradeLevel();
+            Integer newGrade = gradeLevelComboBox.getValue();
+            
+            // Validate Grade 12 re-enrollment requires reason
+            if (currentGrade != null && currentGrade == 12 && newGrade != null && newGrade == 12) {
+                String reason = reEnrollmentReasonField != null ? reEnrollmentReasonField.getText().trim() : "";
+                if (reason.isEmpty()) {
+                    showError("Re-enrollment reason is required for Grade 12 students. Please provide a reason (e.g., Repeater, Failed subjects, etc.).");
+                    return;
+                }
+            }
+            
+            // Validate Grade 11 can only be promoted to Grade 12
+            if (currentGrade != null && currentGrade == 11 && (newGrade == null || newGrade != 12)) {
+                showError("Grade 11 students can only be promoted to Grade 12.");
+                return;
+            }
+        }
+        
         // Disable save button and show loading state
         saveButton.setDisable(true);
         saveButton.setText("Saving...");
@@ -612,11 +765,35 @@ public class AddStudentController {
         studentDto.setLrn(lrn);
         studentDto.setEnrollmentStatus(enrollmentStatus);
         
-        // Save student in background thread to avoid blocking UI
+        // Set re-enrollment reason if in re-enrollment mode and Grade 12
+        if (currentMode == Mode.RE_ENROLL && selectedStudentForReEnrollment != null) {
+            Integer currentGrade = selectedStudentForReEnrollment.getGradeLevel();
+            if (currentGrade != null && currentGrade == 12) {
+                String reason = reEnrollmentReasonField != null ? reEnrollmentReasonField.getText().trim() : "";
+                studentDto.setReEnrollmentReason(reason);
+            }
+        }
+        
+        // Save or update student in background thread to avoid blocking UI
         new Thread(() -> {
             try {
-                // Save student (this is a blocking database operation)
-                StudentDto savedStudent = studentService.saveStudent(studentDto);
+                StudentDto savedStudent;
+                
+                if (currentMode == Mode.RE_ENROLL && selectedStudentForReEnrollment != null) {
+                    // Re-enrollment: Update existing student
+                    studentDto.setId(selectedStudentForReEnrollment.getId());
+                    
+                    // Set current school year for re-enrollment
+                    if (schoolYearService != null) {
+                        com.enrollment.system.model.SchoolYear currentSchoolYear = schoolYearService.getCurrentSchoolYearEntity();
+                        studentDto.setSchoolYearId(currentSchoolYear.getId());
+                    }
+                    
+                    savedStudent = studentService.updateStudent(selectedStudentForReEnrollment.getId(), studentDto);
+                } else {
+                    // New student: Save new student
+                    savedStudent = studentService.saveStudent(studentDto);
+                }
                 
                 // Update UI on JavaFX thread
                 Platform.runLater(() -> {
@@ -626,8 +803,13 @@ public class AddStudentController {
                     // Show success message
                     Alert alert = new Alert(Alert.AlertType.INFORMATION);
                     alert.setTitle("Success");
-                    alert.setHeaderText("Student Added Successfully");
-                    alert.setContentText("Student " + savedStudent.getName() + " has been saved successfully.");
+                    if (currentMode == Mode.RE_ENROLL) {
+                        alert.setHeaderText("Student Re-Enrolled Successfully");
+                        alert.setContentText("Student " + savedStudent.getName() + " has been re-enrolled successfully.");
+                    } else {
+                        alert.setHeaderText("Student Added Successfully");
+                        alert.setContentText("Student " + savedStudent.getName() + " has been saved successfully.");
+                    }
                     alert.showAndWait();
                     
                     // Close the form
@@ -641,10 +823,439 @@ public class AddStudentController {
                 Platform.runLater(() -> {
                     saveButton.setDisable(false);
                     saveButton.setText("Save Student");
-                    showError("Error saving student: " + e.getMessage());
+                    showError("Error " + (currentMode == Mode.RE_ENROLL ? "re-enrolling" : "saving") + " student: " + e.getMessage());
                 });
             }
         }).start();
+    }
+    
+    @FXML
+    private void handleAddNewStudent() {
+        currentMode = Mode.NEW_STUDENT;
+        selectedStudentForReEnrollment = null;
+        
+        // Hide choice screen, show form
+        if (choiceScreen != null) {
+            choiceScreen.setVisible(false);
+            choiceScreen.setManaged(false);
+        }
+        if (formContainer != null) {
+            formContainer.setVisible(true);
+            formContainer.setManaged(true);
+        }
+        if (studentSelectionScreen != null) {
+            studentSelectionScreen.setVisible(false);
+            studentSelectionScreen.setManaged(false);
+        }
+        
+        // Update form title and hide mode indicator
+        if (formTitleLabel != null) {
+            formTitleLabel.setText("Add New Student");
+        }
+        if (modeIndicatorLabel != null) {
+            modeIndicatorLabel.setVisible(false);
+        }
+        if (reEnrollmentReasonSection != null) {
+            reEnrollmentReasonSection.setVisible(false);
+            reEnrollmentReasonSection.setManaged(false);
+        }
+        
+        // Clear all fields
+        clearAllFields();
+    }
+    
+    @FXML
+    private void handleReEnrollStudent() {
+        currentMode = Mode.RE_ENROLL;
+        
+        // Hide choice screen, show student selection
+        if (choiceScreen != null) {
+            choiceScreen.setVisible(false);
+            choiceScreen.setManaged(false);
+        }
+        if (studentSelectionScreen != null) {
+            studentSelectionScreen.setVisible(true);
+            studentSelectionScreen.setManaged(true);
+        }
+        if (formContainer != null) {
+            formContainer.setVisible(false);
+            formContainer.setManaged(false);
+        }
+        
+        // Load eligible students
+        loadEligibleStudentsForReEnrollment();
+    }
+    
+    @FXML
+    private void handleCancelSelection() {
+        // Go back to choice screen
+        if (choiceScreen != null) {
+            choiceScreen.setVisible(true);
+            choiceScreen.setManaged(true);
+        }
+        if (studentSelectionScreen != null) {
+            studentSelectionScreen.setVisible(false);
+            studentSelectionScreen.setManaged(false);
+        }
+        selectedStudentForReEnrollment = null;
+    }
+    
+    @FXML
+    private void handleSelectStudent() {
+        StudentDto selected = studentSelectionTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("No Selection");
+            alert.setHeaderText(null);
+            alert.setContentText("Please select a student from the table.");
+            alert.showAndWait();
+            return;
+        }
+        
+        selectedStudentForReEnrollment = selected;
+        
+        // Hide selection screen, show form
+        if (studentSelectionScreen != null) {
+            studentSelectionScreen.setVisible(false);
+            studentSelectionScreen.setManaged(false);
+        }
+        if (formContainer != null) {
+            formContainer.setVisible(true);
+            formContainer.setManaged(true);
+        }
+        
+        // Update form title and show mode indicator
+        if (formTitleLabel != null) {
+            formTitleLabel.setText("Re-Enroll Student");
+        }
+        if (modeIndicatorLabel != null) {
+            modeIndicatorLabel.setText("(Re-Enrollment Mode)");
+            modeIndicatorLabel.setVisible(true);
+        }
+        
+        // Populate form with selected student data
+        populateFormFromStudent(selected);
+    }
+    
+    private void loadEligibleStudentsForReEnrollment() {
+        if (schoolYearService == null || studentRepository == null) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText(null);
+            alert.setContentText("School year service is not available.");
+            alert.showAndWait();
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                // Get previous school year
+                com.enrollment.system.model.SchoolYear previousSchoolYear = schoolYearService.getPreviousSchoolYearEntity();
+                
+                if (previousSchoolYear == null) {
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                        alert.setTitle("No Previous School Year");
+                        alert.setHeaderText(null);
+                        alert.setContentText("No previous school year found. Re-enrollment is only available for students from the previous school year.");
+                        alert.showAndWait();
+                        handleCancelSelection();
+                    });
+                    return;
+                }
+                
+                // Get all students from repository with section loaded
+                List<Student> allStudentsEntity = studentRepository.findAllWithSectionByOrderByNameAsc();
+                
+                // Filter eligible students (Grade 11 or Grade 12 from previous school year, not archived)
+                List<StudentDto> eligibleStudents = allStudentsEntity.stream()
+                    .filter(student -> {
+                        if (Boolean.TRUE.equals(student.getIsArchived())) {
+                            return false;
+                        }
+                        if (student.getSchoolYear() == null) {
+                            return false;
+                        }
+                        if (!student.getSchoolYear().getId().equals(previousSchoolYear.getId())) {
+                            return false;
+                        }
+                        Integer gradeLevel = student.getGradeLevel();
+                        return gradeLevel != null && (gradeLevel == 11 || gradeLevel == 12);
+                    })
+                    .map(student -> {
+                        // Ensure section is loaded before converting to DTO
+                        if (student.getSection() != null) {
+                            student.getSection().getName(); // Trigger lazy load
+                        }
+                        return StudentDto.fromStudent(student);
+                    })
+                    .collect(Collectors.toList());
+                
+                Platform.runLater(() -> {
+                    eligibleStudentsList = FXCollections.observableArrayList(eligibleStudents);
+                    
+                    // Create filtered list
+                    filteredStudentsList = new FilteredList<>(eligibleStudentsList, p -> true);
+                    
+                    // Create sorted list
+                    SortedList<StudentDto> sortedList = new SortedList<>(filteredStudentsList);
+                    sortedList.comparatorProperty().bind(studentSelectionTable.comparatorProperty());
+                    
+                    if (studentSelectionTable != null) {
+                        studentSelectionTable.setItems(sortedList);
+                    }
+                    
+                    // Update filter combo boxes with available values
+                    updateFilterComboBoxes(eligibleStudents);
+                    
+                    // Update results count
+                    updateResultsCount();
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Error");
+                    alert.setHeaderText(null);
+                    alert.setContentText("Error loading eligible students: " + e.getMessage());
+                    alert.showAndWait();
+                });
+            }
+        }).start();
+    }
+    
+    private void populateFormFromStudent(StudentDto student) {
+        // Populate all fields with student data
+        if (nameField != null) nameField.setText(student.getName());
+        if (birthdatePicker != null) birthdatePicker.setValue(student.getBirthdate());
+        if (ageField != null && student.getAge() != null) ageField.setText(String.valueOf(student.getAge()));
+        if (sexComboBox != null) sexComboBox.setValue(student.getSex());
+        if (addressField != null) addressField.setText(student.getAddress());
+        if (contactNumberField != null) contactNumberField.setText(student.getContactNumber());
+        if (parentGuardianNameField != null) parentGuardianNameField.setText(student.getParentGuardianName());
+        if (parentGuardianContactField != null) parentGuardianContactField.setText(student.getParentGuardianContact());
+        if (parentGuardianRelationshipComboBox != null) parentGuardianRelationshipComboBox.setValue(student.getParentGuardianRelationship());
+        
+        // Set grade level - Grade 11 becomes 12, Grade 12 stays 12
+        Integer currentGrade = student.getGradeLevel();
+        if (gradeLevelComboBox != null) {
+            if (currentGrade != null && currentGrade == 11) {
+                gradeLevelComboBox.setValue(12); // Promote to Grade 12
+            } else if (currentGrade != null && currentGrade == 12) {
+                gradeLevelComboBox.setValue(12); // Stay at Grade 12
+                // Show re-enrollment reason field for Grade 12
+                if (reEnrollmentReasonSection != null) {
+                    reEnrollmentReasonSection.setVisible(true);
+                    reEnrollmentReasonSection.setManaged(true);
+                }
+            }
+        }
+        
+        if (strandComboBox != null) strandComboBox.setValue(student.getStrand());
+        if (previousSchoolField != null) previousSchoolField.setText(student.getPreviousSchool());
+        if (gwaField != null && student.getGwa() != null) gwaField.setText(String.valueOf(student.getGwa()));
+        if (lrnField != null) lrnField.setText(student.getLrn());
+        if (enrollmentStatusComboBox != null) enrollmentStatusComboBox.setValue("Enrolled");
+        
+        // Update sections based on grade and strand
+        updateSections();
+    }
+    
+    private void clearAllFields() {
+        if (nameField != null) nameField.clear();
+        if (birthdatePicker != null) birthdatePicker.setValue(null);
+        if (ageField != null) ageField.clear();
+        if (sexComboBox != null) sexComboBox.setValue(null);
+        if (addressField != null) addressField.clear();
+        if (contactNumberField != null) contactNumberField.clear();
+        if (parentGuardianNameField != null) parentGuardianNameField.clear();
+        if (parentGuardianContactField != null) parentGuardianContactField.clear();
+        if (parentGuardianRelationshipComboBox != null) parentGuardianRelationshipComboBox.setValue(null);
+        if (gradeLevelComboBox != null) gradeLevelComboBox.setValue(null);
+        if (strandComboBox != null) strandComboBox.setValue(null);
+        if (sectionComboBox != null) sectionComboBox.setValue(null);
+        if (previousSchoolField != null) previousSchoolField.clear();
+        if (gwaField != null) gwaField.clear();
+        if (lrnField != null) lrnField.clear();
+        if (enrollmentStatusComboBox != null) enrollmentStatusComboBox.setValue("Pending");
+        if (reEnrollmentReasonField != null) reEnrollmentReasonField.clear();
+    }
+    
+    private void setupSearchAndFilters() {
+        // Search field listener
+        if (searchField != null) {
+            searchField.textProperty().addListener((observable, oldValue, newValue) -> {
+                applyFilters();
+            });
+        }
+        
+        // Filter combo box listeners
+        if (filterGradeCombo != null) {
+            filterGradeCombo.valueProperty().addListener((observable, oldValue, newValue) -> {
+                applyFilters();
+            });
+        }
+        
+        if (filterStrandCombo != null) {
+            filterStrandCombo.valueProperty().addListener((observable, oldValue, newValue) -> {
+                applyFilters();
+            });
+        }
+        
+        if (filterSectionCombo != null) {
+            filterSectionCombo.valueProperty().addListener((observable, oldValue, newValue) -> {
+                applyFilters();
+            });
+        }
+    }
+    
+    private void applyFilters() {
+        if (filteredStudentsList == null) {
+            return;
+        }
+        
+        filteredStudentsList.setPredicate(student -> {
+            // Search filter - search across all student information (numbers and letters)
+            String searchText = searchField != null ? searchField.getText().toLowerCase() : "";
+            if (!searchText.isEmpty()) {
+                boolean matchesSearch = 
+                    // Name
+                    (student.getName() != null && student.getName().toLowerCase().contains(searchText)) ||
+                    // Grade level (as string - works for both "11" and "12")
+                    (student.getGradeLevel() != null && String.valueOf(student.getGradeLevel()).contains(searchText)) ||
+                    // Strand
+                    (student.getStrand() != null && student.getStrand().toLowerCase().contains(searchText)) ||
+                    // Section name
+                    (student.getSectionName() != null && student.getSectionName().toLowerCase().contains(searchText)) ||
+                    // LRN
+                    (student.getLrn() != null && student.getLrn().toLowerCase().contains(searchText)) ||
+                    // Contact number
+                    (student.getContactNumber() != null && student.getContactNumber().contains(searchText)) ||
+                    // Address
+                    (student.getAddress() != null && student.getAddress().toLowerCase().contains(searchText)) ||
+                    // Previous school
+                    (student.getPreviousSchool() != null && student.getPreviousSchool().toLowerCase().contains(searchText)) ||
+                    // GWA (as string - works for numbers like "85.5")
+                    (student.getGwa() != null && String.valueOf(student.getGwa()).contains(searchText)) ||
+                    // Sex
+                    (student.getSex() != null && student.getSex().toLowerCase().contains(searchText)) ||
+                    // Parent/Guardian name
+                    (student.getParentGuardianName() != null && student.getParentGuardianName().toLowerCase().contains(searchText)) ||
+                    // Parent/Guardian contact
+                    (student.getParentGuardianContact() != null && student.getParentGuardianContact().contains(searchText));
+                if (!matchesSearch) {
+                    return false;
+                }
+            }
+            
+            // Grade level filter
+            Integer filterGrade = filterGradeCombo != null ? filterGradeCombo.getValue() : null;
+            if (filterGrade != null) {
+                if (student.getGradeLevel() == null || !student.getGradeLevel().equals(filterGrade)) {
+                    return false;
+                }
+            }
+            
+            // Strand filter
+            String filterStrand = filterStrandCombo != null ? filterStrandCombo.getValue() : null;
+            if (filterStrand != null && !filterStrand.isEmpty()) {
+                if (student.getStrand() == null || !student.getStrand().equals(filterStrand)) {
+                    return false;
+                }
+            }
+            
+            // Section filter
+            String filterSection = filterSectionCombo != null ? filterSectionCombo.getValue() : null;
+            if (filterSection != null && !filterSection.isEmpty()) {
+                if (student.getSectionName() == null || !student.getSectionName().equals(filterSection)) {
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+        
+        updateResultsCount();
+    }
+    
+    private void updateFilterComboBoxes(List<StudentDto> students) {
+        if (students == null || students.isEmpty()) {
+            return;
+        }
+        
+        // Update strand combo box
+        if (filterStrandCombo != null) {
+            List<String> strands = students.stream()
+                .map(StudentDto::getStrand)
+                .filter(strand -> strand != null && !strand.isEmpty())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+            
+            String currentValue = filterStrandCombo.getValue();
+            filterStrandCombo.getItems().clear();
+            filterStrandCombo.getItems().add(null); // Add "All" option
+            filterStrandCombo.getItems().addAll(strands);
+            if (currentValue != null && strands.contains(currentValue)) {
+                filterStrandCombo.setValue(currentValue);
+            }
+        }
+        
+        // Update section combo box
+        if (filterSectionCombo != null) {
+            List<String> sections = students.stream()
+                .map(StudentDto::getSectionName)
+                .filter(section -> section != null && !section.isEmpty())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+            
+            String currentValue = filterSectionCombo.getValue();
+            filterSectionCombo.getItems().clear();
+            filterSectionCombo.getItems().add(null); // Add "All" option
+            filterSectionCombo.getItems().addAll(sections);
+            if (currentValue != null && sections.contains(currentValue)) {
+                filterSectionCombo.setValue(currentValue);
+            }
+        }
+    }
+    
+    private void updateResultsCount() {
+        if (resultsCountLabel == null || filteredStudentsList == null || eligibleStudentsList == null) {
+            return;
+        }
+        
+        int filteredCount = filteredStudentsList.size();
+        int totalCount = eligibleStudentsList.size();
+        
+        if (filteredCount == totalCount) {
+            resultsCountLabel.setText("Showing " + totalCount + " student(s)");
+        } else {
+            resultsCountLabel.setText("Showing " + filteredCount + " of " + totalCount + " student(s)");
+        }
+    }
+    
+    @FXML
+    private void handleClearSearch() {
+        if (searchField != null) {
+            searchField.clear();
+        }
+    }
+    
+    @FXML
+    private void handleClearFilters() {
+        if (filterGradeCombo != null) {
+            filterGradeCombo.setValue(null);
+        }
+        if (filterStrandCombo != null) {
+            filterStrandCombo.setValue(null);
+        }
+        if (filterSectionCombo != null) {
+            filterSectionCombo.setValue(null);
+        }
+        if (searchField != null) {
+            searchField.clear();
+        }
     }
     
     @FXML

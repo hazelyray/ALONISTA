@@ -12,11 +12,81 @@
     
     <center>
         <VBox spacing="10" style="-fx-padding: 20;" alignment="TOP_CENTER">
-            <!-- Header -->
-            <Label text="Add New Student" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+            <!-- Choice Screen (Initial) -->
+            <VBox fx:id="choiceScreen" spacing="20" alignment="CENTER" style="-fx-padding: 40;">
+                <Label text="Add Student" style="-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+                <Label text="Please select an option:" style="-fx-font-size: 16px; -fx-text-fill: #7f8c8d;"/>
+                
+                <HBox spacing="20" alignment="CENTER" style="-fx-padding: 20;">
+                    <Button fx:id="btnAddNewStudent" text="➕ Add Fresh/New Student" onAction="#handleAddNewStudent"
+                            style="-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 15 40; -fx-cursor: hand; -fx-pref-width: 250; -fx-pref-height: 60;"/>
+                    <Button fx:id="btnReEnrollStudent" text="🔄 Re-Enroll Existing Student" onAction="#handleReEnrollStudent"
+                            style="-fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 15 40; -fx-cursor: hand; -fx-pref-width: 250; -fx-pref-height: 60;"/>
+                </HBox>
+            </VBox>
             
-            <!-- Form Container -->
-            <VBox spacing="10" style="-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);" maxWidth="1400">
+            <!-- Student Selection Screen (Re-Enrollment Mode) -->
+            <VBox fx:id="studentSelectionScreen" spacing="15" style="-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);" maxWidth="1400" visible="false" managed="false">
+                <Label text="Select Student to Re-Enroll" style="-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+                <Label text="Select a student from the previous school year to re-enroll:" style="-fx-font-size: 12px; -fx-text-fill: #7f8c8d;"/>
+                
+                <!-- Search and Filter Section -->
+                <VBox spacing="10" style="-fx-padding: 10 0;">
+                    <!-- Search Bar -->
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Label text="Search:" style="-fx-font-weight: bold; -fx-font-size: 12px;"/>
+                        <TextField fx:id="searchField" promptText="Search by name, grade, strand, section, LRN, contact, address, etc..." prefWidth="500" prefHeight="30"
+                                   style="-fx-font-size: 12px;"/>
+                        <Button fx:id="btnClearSearch" text="Clear" onAction="#handleClearSearch"
+                                style="-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 12px; -fx-background-radius: 5; -fx-padding: 6 15; -fx-cursor: hand;"/>
+                    </HBox>
+                    
+                    <!-- Filter Section -->
+                    <HBox spacing="15" alignment="CENTER_LEFT">
+                        <Label text="Filters:" style="-fx-font-weight: bold; -fx-font-size: 12px;"/>
+                        
+                        <Label text="Grade Level:" style="-fx-font-size: 12px;"/>
+                        <ComboBox fx:id="filterGradeCombo" prefWidth="100" prefHeight="30" promptText="All"/>
+                        
+                        <Label text="Strand:" style="-fx-font-size: 12px;"/>
+                        <ComboBox fx:id="filterStrandCombo" prefWidth="150" prefHeight="30" promptText="All"/>
+                        
+                        <Label text="Section:" style="-fx-font-size: 12px;"/>
+                        <ComboBox fx:id="filterSectionCombo" prefWidth="150" prefHeight="30" promptText="All"/>
+                        
+                        <Button fx:id="btnClearFilters" text="Clear Filters" onAction="#handleClearFilters"
+                                style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 12px; -fx-background-radius: 5; -fx-padding: 6 15; -fx-cursor: hand;"/>
+                    </HBox>
+                    
+                    <!-- Results Count -->
+                    <Label fx:id="resultsCountLabel" text="" style="-fx-font-size: 11px; -fx-text-fill: #7f8c8d;"/>
+                </VBox>
+                
+                <TableView fx:id="studentSelectionTable" prefHeight="350" style="-fx-background-color: white;">
+                    <columns>
+                        <TableColumn fx:id="selectNameColumn" text="Name" prefWidth="300"/>
+                        <TableColumn fx:id="selectGradeColumn" text="Grade Level" prefWidth="120"/>
+                        <TableColumn fx:id="selectStrandColumn" text="Strand" prefWidth="150"/>
+                        <TableColumn fx:id="selectSectionColumn" text="Section" prefWidth="200"/>
+                    </columns>
+                </TableView>
+                
+                <HBox spacing="12" alignment="CENTER_RIGHT" style="-fx-padding: 10 0 0 0;">
+                    <Button fx:id="btnCancelSelection" text="Cancel" onAction="#handleCancelSelection"
+                            style="-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 13px; -fx-background-radius: 5; -fx-padding: 8 25; -fx-cursor: hand;"/>
+                    <Button fx:id="btnSelectStudent" text="Select Student" onAction="#handleSelectStudent"
+                            style="-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-background-radius: 5; -fx-padding: 8 25; -fx-cursor: hand;"/>
+                </HBox>
+            </VBox>
+            
+            <!-- Form Container (New Student or Re-Enrollment) -->
+            <VBox fx:id="formContainer" spacing="10" style="-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 20; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);" maxWidth="1400" visible="false" managed="false">
+                
+                <!-- Header with mode indicator -->
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label fx:id="formTitleLabel" text="Add New Student" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+                    <Label fx:id="modeIndicatorLabel" text="" style="-fx-font-size: 14px; -fx-text-fill: #e67e22; -fx-font-weight: bold;" visible="false"/>
+                </HBox>
                 
                 <!-- Personal Information Section -->
                 <Label text="Personal Information" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
@@ -110,6 +180,15 @@
                     <ComboBox fx:id="enrollmentStatusComboBox" GridPane.columnIndex="2" GridPane.rowIndex="3" prefHeight="30"/>
                 </GridPane>
                 
+                <!-- Re-Enrollment Reason Section (Only for Grade 12 re-enrollment) -->
+                <VBox fx:id="reEnrollmentReasonSection" spacing="8" visible="false" managed="false" style="-fx-padding: 10 0;">
+                    <Separator style="-fx-padding: 5 0;"/>
+                    <Label text="Re-Enrollment Information" style="-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+                    <Label text="Reason for Re-Enrollment *" style="-fx-font-weight: bold; -fx-font-size: 12px;"/>
+                    <TextArea fx:id="reEnrollmentReasonField" prefHeight="80" wrapText="true" 
+                              promptText="Please provide a reason for re-enrollment (e.g., Repeater, Failed subjects, etc.)"/>
+                </VBox>
+                
                 <!-- Error Label -->
                 <Label fx:id="errorLabel" text="" style="-fx-text-fill: #e74c3c; -fx-font-size: 11px; -fx-padding: 8; -fx-background-color: #ffe6e6; -fx-background-radius: 5;" visible="false" wrapText="true" maxWidth="900"/>
                 
@@ -125,4 +204,3 @@
     </center>
     
 </BorderPane>
-

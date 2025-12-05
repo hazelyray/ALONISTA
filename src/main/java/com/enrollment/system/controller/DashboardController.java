@@ -1,21 +1,25 @@
 package com.enrollment.system.controller;
 
 import com.enrollment.system.dto.UserDto;
-import com.enrollment.system.controller.ViewStudentsController;
-import com.enrollment.system.controller.ArchiveStudentsController;
+import com.enrollment.system.dto.StudentDto;
+import com.enrollment.system.service.StudentService;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
+import java.util.List;
 
 @Component
 public class DashboardController {
@@ -63,19 +67,22 @@ public class DashboardController {
     private VBox reportsSubmenu;
     
     @FXML
-    private Button btnAdminSettings;
+    private Button btnSettings;
+    
+    @FXML
+    private Button btnUserAccounts;
     
     @FXML
     private Button btnProfile;
     
     @FXML
-    private Button btnChangePassword;
+    private Button btnSchoolYearManagement;
     
     @FXML
-    private Button btnSystemSettings;
+    private VBox settingsSubmenu;
     
     @FXML
-    private VBox adminSettingsSubmenu;
+    private VBox userAccountsSubmenu;
     
     @FXML
     private VBox dashboardContent;
@@ -89,17 +96,115 @@ public class DashboardController {
     @Autowired
     private ApplicationContext applicationContext;
     
+    @Autowired(required = false)
+    private StudentService studentService;
+    
+    @Autowired(required = false)
+    private com.enrollment.system.service.SchoolYearService schoolYearService;
+    
+    @Autowired(required = false)
+    private com.enrollment.system.repository.StudentRepository studentRepository;
+    
     private UserDto currentUser;
     private String sessionToken;
     private boolean studentManagementExpanded = false;
     private boolean reportsExpanded = false;
-    private boolean adminSettingsExpanded = false;
+    private boolean settingsExpanded = false;
+    private boolean userAccountsExpanded = false;
     
     @FXML
     public void initialize() {
-        if (btnDashboard != null) {
-            btnDashboard.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230;");
+        // Minimal initialization - just set button style
+        // Everything else is deferred to prevent blocking login
+        try {
+            if (btnDashboard != null) {
+                btnDashboard.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.4), 8, 0, 0, 0);");
+            }
+        } catch (Exception e) {
+            // Ignore - don't break initialization
         }
+        
+        // Set up hover effects after a short delay to ensure UI is ready
+        // Use a separate thread to avoid blocking
+        new Thread(() -> {
+            try {
+                Thread.sleep(100); // Small delay to ensure UI is initialized
+                Platform.runLater(() -> {
+                    try {
+                        setupButtonHoverEffects();
+                    } catch (Exception e) {
+                        // Silently fail - hover effects are optional
+                    }
+                });
+            } catch (Exception e) {
+                // Ignore
+            }
+        }).start();
+    }
+    
+    private void setupButtonHoverEffects() {
+        // Main menu buttons with hover effects
+        // Use try-catch for each to prevent one failure from breaking all
+        try {
+            setupMainButtonHover(btnDashboard, "#3498db");
+            setupMainButtonHover(btnStudentManagement, "#3498db");
+            setupMainButtonHover(btnStrandAndSection, "#9b59b6");
+            setupMainButtonHover(btnReports, "#3498db");
+            setupMainButtonHover(btnSettings, "#e67e22");
+        } catch (Exception e) {
+            System.err.println("Warning: Error setting up main button hover effects: " + e.getMessage());
+        }
+        
+        // Submenu buttons with unique hover colors
+        try {
+            setupSubmenuButtonHover(btnAddStudent, "#27ae60");
+            setupSubmenuButtonHover(btnViewStudents, "#3498db");
+            setupSubmenuButtonHover(btnByGradeLevel, "#3498db");
+            setupSubmenuButtonHover(btnByStrand, "#9b59b6");
+            setupSubmenuButtonHover(btnEnrollmentSummary, "#16a085");
+            setupSubmenuButtonHover(btnArchiveStudents, "#95a5a6");
+            setupSubmenuButtonHover(btnUserAccounts, "#3498db");
+            setupSubmenuButtonHover(btnProfile, "#3498db");
+            setupSubmenuButtonHover(btnSchoolYearManagement, "#16a085");
+        } catch (Exception e) {
+            System.err.println("Warning: Error setting up submenu button hover effects: " + e.getMessage());
+        }
+    }
+    
+    private void setupMainButtonHover(Button button, String hoverColor) {
+        if (button == null) return;
+        
+        String hoverStyle = "-fx-background-color: " + hoverColor + "; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.4), 8, 0, 0, 0); -fx-translate-x: 5;";
+        
+        // Store original style
+        final String[] originalStyle = {button.getStyle()};
+        
+        button.setOnMouseEntered(e -> {
+            originalStyle[0] = button.getStyle();
+            button.setStyle(hoverStyle);
+        });
+        button.setOnMouseExited(e -> {
+            // Reset to original style (which might be active state)
+            button.setStyle(originalStyle[0]);
+        });
+    }
+    
+    private void setupSubmenuButtonHover(Button button, String hoverColor) {
+        if (button == null) return;
+        
+        String hoverStyle = "-fx-background-color: " + hoverColor + "; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225; -fx-translate-x: 3;";
+        
+        // Store original style
+        final String[] originalStyle = {button.getStyle()};
+        
+        button.setOnMouseEntered(e -> {
+            originalStyle[0] = button.getStyle();
+            button.setStyle(hoverStyle);
+        });
+        button.setOnMouseExited(e -> {
+            // Reset to original style
+            button.setStyle(originalStyle[0]);
+        });
     }
     
     public void setUserSession(UserDto user, String token) {
@@ -117,15 +222,169 @@ public class DashboardController {
             adminSection.setVisible(false);
             adminSection.setManaged(false);
         }
+        
+        // Load dashboard statistics after user session is set
+        // Use Platform.runLater to ensure UI is ready
+        Platform.runLater(() -> {
+            try {
+                loadDashboardStatistics();
+            } catch (Exception e) {
+                // Don't let dashboard loading break login
+                e.printStackTrace();
+            }
+        });
     }
+    
     
     @FXML
     private void showDashboard() {
         resetMainButtonStyles();
         if (btnDashboard != null) {
-            btnDashboard.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230;");
+            btnDashboard.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.4), 8, 0, 0, 0);");
         }
-        // Blank for now
+        // Load dashboard statistics
+        loadDashboardStatistics();
+    }
+    
+    private void loadDashboardStatistics() {
+        if (dashboardContent == null) {
+            return;
+        }
+        
+        // If studentService is not available, show a message
+        if (studentService == null) {
+            dashboardContent.getChildren().clear();
+            Label messageLabel = new Label("Dashboard statistics will be available after login.");
+            messageLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-padding: 20;");
+            dashboardContent.getChildren().add(messageLabel);
+            return;
+        }
+        
+        // Clear existing content
+        dashboardContent.getChildren().clear();
+        
+        // Load statistics in background thread
+        new Thread(() -> {
+            try {
+                List<StudentDto> allStudents = studentService.getAllStudents();
+                
+                // Calculate statistics
+                long totalEnrolled = allStudents.stream()
+                    .filter(s -> "Enrolled".equals(s.getEnrollmentStatus()))
+                    .count();
+                
+                long grade11 = allStudents.stream()
+                    .filter(s -> "Enrolled".equals(s.getEnrollmentStatus()) && 
+                                s.getGradeLevel() != null && s.getGradeLevel() == 11)
+                    .count();
+                
+                long grade12 = allStudents.stream()
+                    .filter(s -> "Enrolled".equals(s.getEnrollmentStatus()) && 
+                                s.getGradeLevel() != null && s.getGradeLevel() == 12)
+                    .count();
+                
+                long pending = allStudents.stream()
+                    .filter(s -> "Pending".equals(s.getEnrollmentStatus()))
+                    .count();
+                
+                long male = allStudents.stream()
+                    .filter(s -> "Enrolled".equals(s.getEnrollmentStatus()) && 
+                                "Male".equals(s.getSex()))
+                    .count();
+                
+                long female = allStudents.stream()
+                    .filter(s -> "Enrolled".equals(s.getEnrollmentStatus()) && 
+                                "Female".equals(s.getSex()))
+                    .count();
+                
+                // Update UI on JavaFX thread
+                Platform.runLater(() -> {
+                    buildDashboardCards(totalEnrolled, grade11, grade12, pending, male, female);
+                });
+                
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    Label errorLabel = new Label("Error loading dashboard statistics: " + e.getMessage());
+                    errorLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 14px;");
+                    dashboardContent.getChildren().add(errorLabel);
+                });
+            }
+        }).start();
+    }
+    
+    private void buildDashboardCards(long totalEnrolled, long grade11, long grade12, long pending, long male, long female) {
+        dashboardContent.getChildren().clear();
+        
+        // Title
+        Label titleLabel = new Label("📊 Enrollment Dashboard Summary");
+        titleLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 20 0;");
+        dashboardContent.getChildren().add(titleLabel);
+        
+        // First row: Main statistics
+        HBox firstRow = new HBox(20);
+        firstRow.setAlignment(Pos.CENTER_LEFT);
+        firstRow.getChildren().addAll(
+            createStatCard("🎓 Total Enrolled", String.valueOf(totalEnrolled), "#3498db", "The overall number of officially enrolled students"),
+            createStatCard("📚 Grade 11", String.valueOf(grade11), "#9b59b6", "Number of currently enrolled Grade 11 students"),
+            createStatCard("🎓 Grade 12", String.valueOf(grade12), "#e67e22", "Number of currently enrolled Grade 12 students")
+        );
+        dashboardContent.getChildren().add(firstRow);
+        
+        // Second row: Pending and Gender stats
+        HBox secondRow = new HBox(20);
+        secondRow.setAlignment(Pos.CENTER_LEFT);
+        secondRow.getChildren().addAll(
+            createStatCard("⏳ Pending Applications", String.valueOf(pending), "#f39c12", "Students who submitted info but still need approval"),
+            createStatCard("👨 Male Students", String.valueOf(male), "#16a085", "Number of enrolled male students"),
+            createStatCard("👩 Female Students", String.valueOf(female), "#e91e63", "Number of enrolled female students")
+        );
+        dashboardContent.getChildren().add(secondRow);
+    }
+    
+    private VBox createStatCard(String title, String value, String color, String description) {
+        VBox card = new VBox(10);
+        card.setAlignment(Pos.CENTER_LEFT);
+        card.setPadding(new Insets(25));
+        card.setPrefWidth(280);
+        card.setPrefHeight(180);
+        card.setStyle(
+            "-fx-background-color: white; " +
+            "-fx-background-radius: 15; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 3); " +
+            "-fx-border-radius: 15;"
+        );
+        
+        // Title
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #7f8c8d; -fx-font-weight: bold;");
+        
+        // Value
+        Label valueLabel = new Label(value);
+        valueLabel.setStyle(
+            "-fx-font-size: 48px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: " + color + ";"
+        );
+        
+        // Description
+        Label descLabel = new Label(description);
+        descLabel.setWrapText(true);
+        descLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #95a5a6;");
+        descLabel.setMaxWidth(250);
+        
+        // Decorative line
+        Region line = new Region();
+        line.setPrefHeight(3);
+        line.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 2;");
+        line.setMaxWidth(60);
+        
+        VBox contentBox = new VBox(8);
+        contentBox.getChildren().addAll(titleLabel, valueLabel, line, descLabel);
+        
+        card.getChildren().add(contentBox);
+        
+        return card;
     }
     
     @FXML
@@ -136,7 +395,7 @@ public class DashboardController {
             studentManagementSubmenu.setManaged(studentManagementExpanded);
         }
         if (btnStudentManagement != null) {
-            btnStudentManagement.setText(studentManagementExpanded ? "Student Management ▲" : "Student Management ▼");
+            btnStudentManagement.setText("  👥 Student Management");
         }
     }
     
@@ -231,7 +490,7 @@ public class DashboardController {
             reportsSubmenu.setManaged(reportsExpanded);
         }
         if (btnReports != null) {
-            btnReports.setText(reportsExpanded ? "Reports ▲" : "Reports ▼");
+            btnReports.setText("  📈 Reports");
         }
     }
     
@@ -301,36 +560,109 @@ public class DashboardController {
     }
     
     @FXML
-    private void toggleAdminSettings() {
-        adminSettingsExpanded = !adminSettingsExpanded;
-        if (adminSettingsSubmenu != null) {
-            adminSettingsSubmenu.setVisible(adminSettingsExpanded);
-            adminSettingsSubmenu.setManaged(adminSettingsExpanded);
+    private void toggleSettings() {
+        settingsExpanded = !settingsExpanded;
+        if (settingsSubmenu != null) {
+            settingsSubmenu.setVisible(settingsExpanded);
+            settingsSubmenu.setManaged(settingsExpanded);
         }
-        if (btnAdminSettings != null) {
-            btnAdminSettings.setText(adminSettingsExpanded ? "Admin Settings ▲" : "Admin Settings ▼");
+        if (btnSettings != null) {
+            btnSettings.setText("  🔧 SETTINGS");
+        }
+    }
+    
+    @FXML
+    private void toggleUserAccounts() {
+        userAccountsExpanded = !userAccountsExpanded;
+        if (userAccountsSubmenu != null) {
+            userAccountsSubmenu.setVisible(userAccountsExpanded);
+            userAccountsSubmenu.setManaged(userAccountsExpanded);
+        }
+        if (btnUserAccounts != null) {
+            btnUserAccounts.setText("  👥 User Accounts");
         }
     }
     
     @FXML
     private void showProfile() {
         resetSubmenuButtonStyles();
-        btnProfile.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
-        // Blank for now
+        if (btnProfile != null) {
+            btnProfile.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 10 16; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 200;");
+        }
+        
+        try {
+            // Load Profile FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Profile.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent profileRoot = loader.load();
+            
+            // Get the controller to set user session
+            ProfileController controller = loader.getController();
+            if (controller != null && currentUser != null) {
+                controller.setUserSession(currentUser, sessionToken);
+            }
+            
+            // Create new stage for Profile
+            Stage profileStage = new Stage();
+            profileStage.setTitle("User Profile - Seguinon SASHS Enrollment System");
+            profileStage.setScene(new Scene(profileRoot));
+            profileStage.setWidth(900);
+            profileStage.setHeight(700);
+            profileStage.setResizable(false);
+            
+            // Set owner to dashboard stage
+            Stage dashboardStage = (Stage) (btnProfile != null ? btnProfile.getScene().getWindow() : btnSettings.getScene().getWindow());
+            profileStage.initOwner(dashboardStage);
+            
+            // Show Profile window
+            profileStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load Profile page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
     }
     
     @FXML
-    private void showChangePassword() {
+    private void showSchoolYearManagement() {
         resetSubmenuButtonStyles();
-        btnChangePassword.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
-        // Blank for now
-    }
-    
-    @FXML
-    private void showSystemSettings() {
-        resetSubmenuButtonStyles();
-        btnSystemSettings.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
-        // Blank for now
+        if (btnSchoolYearManagement != null) {
+            btnSchoolYearManagement.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
+        }
+        
+        try {
+            // Load School Year Management FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/SchoolYearManagement.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent schoolYearManagementRoot = loader.load();
+            
+            // Create new stage for School Year Management
+            Stage schoolYearManagementStage = new Stage();
+            schoolYearManagementStage.setTitle("School Year Management - Seguinon SHS Enrollment System");
+            schoolYearManagementStage.setScene(new Scene(schoolYearManagementRoot));
+            schoolYearManagementStage.setWidth(1000);
+            schoolYearManagementStage.setHeight(700);
+            schoolYearManagementStage.setResizable(true);
+            
+            // Set owner to dashboard stage
+            Stage dashboardStage = (Stage) (btnSchoolYearManagement != null ? btnSchoolYearManagement.getScene().getWindow() : btnSettings.getScene().getWindow());
+            schoolYearManagementStage.initOwner(dashboardStage);
+            
+            // Show School Year Management window
+            schoolYearManagementStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load School Year Management page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
     }
     
     @FXML
@@ -387,7 +719,7 @@ public class DashboardController {
     }
     
     private void resetMainButtonStyles() {
-        String defaultStyle = "-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230;";
+        String defaultStyle = "-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);";
         if (btnDashboard != null) {
             btnDashboard.setStyle(defaultStyle);
         }
@@ -400,20 +732,21 @@ public class DashboardController {
         if (btnReports != null) {
             btnReports.setStyle(defaultStyle);
         }
-        if (btnAdminSettings != null) {
-            btnAdminSettings.setStyle(defaultStyle);
+        if (btnSettings != null) {
+            btnSettings.setStyle(defaultStyle);
         }
     }
     
     private void resetSubmenuButtonStyles() {
-        String defaultStyle = "-fx-background-color: transparent; -fx-text-fill: #bdc3c7; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;";
+        String defaultStyle = "-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;";
+        String nestedSubmenuStyle = "-fx-background-color: #2c3e50; -fx-text-fill: #ecf0f1; -fx-font-size: 12px; -fx-padding: 10 16; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 200;";
         if (btnAddStudent != null) btnAddStudent.setStyle(defaultStyle);
         if (btnViewStudents != null) btnViewStudents.setStyle(defaultStyle);
         if (btnByGradeLevel != null) btnByGradeLevel.setStyle(defaultStyle);
         if (btnByStrand != null) btnByStrand.setStyle(defaultStyle);
         if (btnEnrollmentSummary != null) btnEnrollmentSummary.setStyle(defaultStyle);
-        if (btnProfile != null) btnProfile.setStyle(defaultStyle);
-        if (btnChangePassword != null) btnChangePassword.setStyle(defaultStyle);
-        if (btnSystemSettings != null) btnSystemSettings.setStyle(defaultStyle);
+        if (btnUserAccounts != null) btnUserAccounts.setStyle(defaultStyle);
+        if (btnProfile != null) btnProfile.setStyle(nestedSubmenuStyle);
+        if (btnSchoolYearManagement != null) btnSchoolYearManagement.setStyle(defaultStyle);
     }
 }

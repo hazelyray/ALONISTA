@@ -24,11 +24,15 @@ public class StudentDto {
     private Double gwa;
     private String lrn;
     private String enrollmentStatus;
+    private Long schoolYearId;
+    private String schoolYear;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Boolean isArchived;
     private String archiveReason;
     private LocalDateTime archivedAt;
+    private String reEnrollmentReason;
+    private Boolean selectedForReEnrollment; // For UI checkbox selection
     
     // Constructors
     public StudentDto() {
@@ -63,11 +67,22 @@ public class StudentDto {
         dto.setGwa(student.getGwa());
         dto.setLrn(student.getLrn());
         dto.setEnrollmentStatus(student.getEnrollmentStatus());
+        try {
+            if (student.getSchoolYear() != null) {
+                dto.setSchoolYearId(student.getSchoolYear().getId());
+                dto.setSchoolYear(student.getSchoolYear().getYear());
+            }
+        } catch (Exception e) {
+            // Handle lazy loading exception - school year not loaded
+            dto.setSchoolYearId(null);
+            dto.setSchoolYear(null);
+        }
         dto.setCreatedAt(student.getCreatedAt());
         dto.setUpdatedAt(student.getUpdatedAt());
         dto.setIsArchived(student.getIsArchived());
         dto.setArchiveReason(student.getArchiveReason());
         dto.setArchivedAt(student.getArchivedAt());
+        dto.setReEnrollmentReason(student.getReEnrollmentReason());
         return dto;
     }
     
@@ -216,6 +231,22 @@ public class StudentDto {
         this.enrollmentStatus = enrollmentStatus;
     }
     
+    public Long getSchoolYearId() {
+        return schoolYearId;
+    }
+    
+    public void setSchoolYearId(Long schoolYearId) {
+        this.schoolYearId = schoolYearId;
+    }
+    
+    public String getSchoolYear() {
+        return schoolYear;
+    }
+    
+    public void setSchoolYear(String schoolYear) {
+        this.schoolYear = schoolYear;
+    }
+    
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -254,5 +285,21 @@ public class StudentDto {
     
     public void setArchivedAt(LocalDateTime archivedAt) {
         this.archivedAt = archivedAt;
+    }
+    
+    public Boolean getSelectedForReEnrollment() {
+        return selectedForReEnrollment;
+    }
+    
+    public void setSelectedForReEnrollment(Boolean selectedForReEnrollment) {
+        this.selectedForReEnrollment = selectedForReEnrollment;
+    }
+    
+    public String getReEnrollmentReason() {
+        return reEnrollmentReason;
+    }
+    
+    public void setReEnrollmentReason(String reEnrollmentReason) {
+        this.reEnrollmentReason = reEnrollmentReason;
     }
 }

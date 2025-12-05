@@ -78,4 +78,54 @@ public class AuthService {
     public boolean isSessionValid(String sessionToken) {
         return sessionManager.isValidSession(sessionToken);
     }
+    
+    @Transactional
+    public boolean changePassword(String username, String currentPassword, String newPassword, String sessionToken) {
+        try {
+            // Validate session
+            if (!isSessionValid(sessionToken)) {
+                return false;
+            }
+            
+            // Verify the user from session matches the username
+            UserDto sessionUser = getCurrentUser(sessionToken);
+            if (sessionUser == null || !sessionUser.getUsername().equals(username)) {
+                return false;
+            }
+            
+            // Find user by username
+            User user = userRepository.findByUsername(username)
+                    .orElse(null);
+            
+            if (user == null) {
+                return false;
+            }
+            
+            // Verify current password
+            if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+                return false;
+            }
+            
+            // Validate new password
+            if (newPassword == null || newPassword.length() < 8) {
+                return false;
+            }
+            
+            // Check if new password is different from current
+            if (passwordEncoder.matches(newPassword, user.getPassword())) {
+                return false;
+            }
+            
+            // Encode and set new password
+            user.setPassword(passwordEncoder.encode(newPassword));
+            user.setUpdatedAt(LocalDateTime.now());
+            userRepository.save(user);
+            
+            return true;
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

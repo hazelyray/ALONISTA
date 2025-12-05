@@ -1,5 +1,6 @@
 package com.enrollment.system.controller;
 
+import com.enrollment.system.dto.ChangePasswordRequest;
 import com.enrollment.system.dto.LoginRequest;
 import com.enrollment.system.dto.LoginResponse;
 import com.enrollment.system.dto.UserDto;
@@ -54,5 +55,23 @@ public class AuthController {
     public ResponseEntity<Boolean> validateSession(@RequestHeader("Authorization") String sessionToken) {
         boolean isValid = authService.isSessionValid(sessionToken);
         return ResponseEntity.ok(isValid);
+    }
+    
+    @PostMapping("/change-password")
+    public ResponseEntity<String> changePassword(
+            @RequestHeader("Authorization") String sessionToken,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        boolean success = authService.changePassword(
+            request.getUsername(),
+            request.getCurrentPassword(),
+            request.getNewPassword(),
+            sessionToken
+        );
+        
+        if (success) {
+            return ResponseEntity.ok("Password changed successfully");
+        } else {
+            return ResponseEntity.status(400).body("Failed to change password. Please check your current password.");
+        }
     }
 }
