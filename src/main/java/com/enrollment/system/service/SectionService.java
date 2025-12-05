@@ -125,5 +125,45 @@ public class SectionService {
         
         return sectionRepository.save(section);
     }
+    
+    @Transactional
+    public void activateSection(Long id) {
+        Section section = sectionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Section not found with id: " + id));
+        section.setIsActive(true);
+        sectionRepository.save(section);
+    }
+    
+    @Transactional
+    public void deletePermanently(Long id) {
+        Section section = sectionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Section not found with id: " + id));
+        
+        // Check if there are enrolled students in this section
+        List<Student> enrolledStudents = studentRepository.findAll().stream()
+                .filter(student -> {
+                    Boolean archived = student.getIsArchived();
+                    if (archived != null && archived) {
+                        return false;
+                    }
+                    if (!"Enrolled".equals(student.getEnrollmentStatus())) {
+                        return false;
+                    }
+                    if (student.getSection() == null) {
+                        return false;
+                    }
+                    return student.getSection().getId().equals(id);
+                })
+                .toList();
+        
+        if (!enrolledStudents.isEmpty()) {
+            throw new IllegalStateException("Cannot delete permanently section " + section.getName() + 
+                    " because it has " + enrolledStudents.size() + " enrolled student(s). " +
+                    "Please reassign or archive these students first.");
+        }
+        
+        // Permanent delete - actually remove from database
+        sectionRepository.delete(section);
+    }
 }
 

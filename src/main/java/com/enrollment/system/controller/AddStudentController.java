@@ -2,7 +2,9 @@ package com.enrollment.system.controller;
 
 import com.enrollment.system.dto.StudentDto;
 import com.enrollment.system.model.Section;
+import com.enrollment.system.model.Strand;
 import com.enrollment.system.service.SectionService;
+import com.enrollment.system.service.StrandService;
 import com.enrollment.system.service.StudentService;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
@@ -78,6 +80,9 @@ public class AddStudentController {
     @Autowired
     private SectionService sectionService;
     
+    @Autowired
+    private StrandService strandService;
+    
     @FXML
     public void initialize() {
         // Initialize Sex ComboBox
@@ -89,8 +94,13 @@ public class AddStudentController {
         // Initialize Grade Level ComboBox
         gradeLevelComboBox.getItems().addAll(11, 12);
         
-        // Initialize Strand ComboBox
-        strandComboBox.getItems().addAll("ABM", "HUMSS", "STEM", "GAS", "TVL");
+        // Initialize Strand ComboBox - Load active strands from service
+        loadActiveStrands();
+        
+        // Add listener to strand to update sections when strand changes
+        strandComboBox.valueProperty().addListener((observable, oldValue, newValue) -> {
+            updateSections();
+        });
         
         // Initialize Enrollment Status ComboBox (only Enrolled and Pending)
         enrollmentStatusComboBox.getItems().addAll("Enrolled", "Pending");
@@ -244,6 +254,20 @@ public class AddStudentController {
                 }
             }
         });
+    }
+    
+    private void loadActiveStrands() {
+        try {
+            java.util.List<Strand> activeStrands = strandService.getActiveStrands();
+            strandComboBox.getItems().clear();
+            for (Strand strand : activeStrands) {
+                strandComboBox.getItems().add(strand.getName());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Fallback to hardcoded values if service fails
+            strandComboBox.getItems().addAll("ABM", "HUMSS", "STEM", "GAS", "TVL");
+        }
     }
     
     private boolean isValidPhilippineContactNumber(String contactNumber) {

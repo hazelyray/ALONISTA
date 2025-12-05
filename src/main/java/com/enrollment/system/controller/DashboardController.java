@@ -83,6 +83,9 @@ public class DashboardController {
     @FXML
     private VBox adminSection;
     
+    @FXML
+    private Button btnStrandAndSection;
+    
     @Autowired
     private ApplicationContext applicationContext;
     
@@ -331,6 +334,44 @@ public class DashboardController {
     }
     
     @FXML
+    private void showStrandAndSection() {
+        resetMainButtonStyles();
+        if (btnStrandAndSection != null) {
+            btnStrandAndSection.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230;");
+        }
+        
+        try {
+            // Load Strand and Section Management FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/SectionsManagement.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent sectionsManagementRoot = loader.load();
+            
+            // Create new stage for Strand and Section Management
+            Stage sectionsManagementStage = new Stage();
+            sectionsManagementStage.setTitle("Strand and Section Management - Seguinon SHS Enrollment System");
+            sectionsManagementStage.setScene(new Scene(sectionsManagementRoot));
+            sectionsManagementStage.setWidth(1400);
+            sectionsManagementStage.setHeight(750);
+            sectionsManagementStage.setResizable(true);
+            
+            // Set owner to dashboard stage
+            Stage dashboardStage = (Stage) btnStrandAndSection.getScene().getWindow();
+            sectionsManagementStage.initOwner(dashboardStage);
+            
+            // Show Strand and Section Management window
+            sectionsManagementStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load Strand and Section Management page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
+    }
+    
+    @FXML
     private void handleLogout() {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Logout");
@@ -352,6 +393,9 @@ public class DashboardController {
         }
         if (btnStudentManagement != null) {
             btnStudentManagement.setStyle(defaultStyle);
+        }
+        if (btnStrandAndSection != null) {
+            btnStrandAndSection.setStyle(defaultStyle);
         }
         if (btnReports != null) {
             btnReports.setStyle(defaultStyle);

@@ -50,6 +50,9 @@
                 </VBox>
             </VBox>
             
+            <Button fx:id="btnStrandAndSection" text="Strand and Section" onAction="#showStrandAndSection"
+                    style="-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 12 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 230;"/>
+            
             <!-- Reports - Expandable Menu -->
             <VBox spacing="0">
                 <HBox alignment="CENTER_LEFT" spacing="5">

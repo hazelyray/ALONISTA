@@ -80,7 +80,7 @@ public class DataInitializer implements CommandLineRunner {
             e.printStackTrace();
         }
         
-        // Initialize test student data (only if no students exist)
+        // Initialize test student data - clear and recreate 30 students
         try {
             initializeTestStudents();
         } catch (Exception e) {
@@ -159,18 +159,25 @@ public class DataInitializer implements CommandLineRunner {
     }
     
     private void initializeTestStudents() {
+        // Clear all existing students first
         long existingCount = studentRepository.count();
-        
-        // Check if we need to add test students
-        if (existingCount >= 30) {
-            System.out.println("✓ Database already has " + existingCount + " students. Skipping test data initialization.");
-            return;
+        if (existingCount > 0) {
+            System.out.println("✓ Clearing " + existingCount + " existing student records...");
+            studentRepository.deleteAll();
+            System.out.println("✓ All existing students cleared.");
         }
         
-        // Calculate how many students to add
-        int studentsToAdd = 30 - (int)existingCount;
-        System.out.println("✓ Initializing " + studentsToAdd + " test student records (existing: " + existingCount + ")...");
+        System.out.println("✓ Creating 30 new test student records with properly aligned data...");
         Random random = new Random();
+        
+        // Get active strands and sections for proper assignment
+        java.util.List<Strand> activeStrands = strandRepository.findByIsActiveTrue();
+        java.util.List<Section> activeSections = sectionRepository.findByIsActiveTrue();
+        
+        if (activeStrands.isEmpty()) {
+            System.err.println("⚠ Warning: No active strands found. Cannot create students.");
+            return;
+        }
         
         // Filipino first names
         String[] firstNames = {
@@ -191,94 +198,142 @@ public class DataInitializer implements CommandLineRunner {
             "Cruz", "Reyes", "Santos", "Garcia", "Lopez", "Martinez", "Rodriguez", "Gonzalez", "Perez", "Sanchez"
         };
         
-        // Strands
-        String[] strands = {"ABM", "HUMSS", "STEM", "GAS", "TVL"};
-        
-        // Enrollment statuses
-        String[] enrollmentStatuses = {"Enrolled", "Pending", "Transferred", "Graduated"};
-        
         // Parent relationships
-        String[] relationships = {"Father", "Mother", "Guardian"};
+        String[] relationships = {"Father", "Mother", "Guardian", "Other"};
         
-        // Previous schools
+        // Previous schools (all spelled out, no abbreviations)
         String[] previousSchools = {
             "Seguinon Elementary School", "San Jose Elementary School", "Rizal Elementary School",
             "Bonifacio Elementary School", "Aguinaldo Elementary School", "Mabini Elementary School",
-            "Quezon Elementary School", "Osmena Elementary School", "Roxas Elementary School", "Magsaysay Elementary School"
+            "Quezon Elementary School", "Osmena Elementary School", "Roxas Elementary School", 
+            "Magsaysay Elementary School", "Lapu-Lapu Elementary School", "Luna Elementary School"
         };
         
         // Addresses
         String[] addresses = {
             "Barangay Poblacion, Seguinon", "Barangay San Jose, Seguinon", "Barangay Rizal, Seguinon",
             "Barangay Bonifacio, Seguinon", "Barangay Aguinaldo, Seguinon", "Barangay Mabini, Seguinon",
-            "Barangay Quezon, Seguinon", "Barangay Osmena, Seguinon", "Barangay Roxas, Seguinon", "Barangay Magsaysay, Seguinon"
+            "Barangay Quezon, Seguinon", "Barangay Osmena, Seguinon", "Barangay Roxas, Seguinon", 
+            "Barangay Magsaysay, Seguinon"
         };
         
+        // Generate unique contact numbers to avoid duplicates
+        java.util.Set<String> usedContacts = new java.util.HashSet<>();
+        java.util.Set<String> usedLrns = new java.util.HashSet<>();
+        
         int successCount = 0;
-        for (int i = 0; i < studentsToAdd; i++) {
+        int enrolledCount = 0;
+        int pendingCount = 0;
+        
+        for (int i = 0; i < 30; i++) {
             try {
                 Student student = new Student();
                 
                 // Generate name (required field)
-                String firstName = firstNames[random.nextInt(firstNames.length)];
-                String lastName = lastNames[random.nextInt(lastNames.length)];
-                String middleName = middleNames[random.nextInt(middleNames.length)];
+                String firstName = firstNames[i % firstNames.length];
+                String lastName = lastNames[i % lastNames.length];
+                String middleName = middleNames[i % middleNames.length];
                 student.setName(firstName + " " + middleName + " " + lastName);
                 
-                // Generate birthdate (age between 15-18)
-                int age = 15 + random.nextInt(4); // 15-18 years old
+                // Generate birthdate (age between 16-18 to meet validation requirements)
+                int age = 16 + random.nextInt(3); // 16-18 years old (must be >= 16)
                 LocalDate birthdate = LocalDate.now().minusYears(age).minusDays(random.nextInt(365));
                 student.setBirthdate(birthdate);
                 student.setAge(age);
                 
                 // Sex (required field)
-                student.setSex(random.nextBoolean() ? "Male" : "Female");
+                student.setSex(i % 2 == 0 ? "Male" : "Female");
                 
-                // Address
-                student.setAddress(addresses[random.nextInt(addresses.length)]);
+                // Address (required)
+                student.setAddress(addresses[i % addresses.length]);
                 
-                // Contact number (Philippine format: 09XXXXXXXXX)
-                String contact = "09" + String.format("%09d", random.nextInt(1000000000));
+                // Contact number (Philippine format: 09XXXXXXXXX, must be unique)
+                String contact;
+                do {
+                    contact = "09" + String.format("%09d", 100000000 + random.nextInt(900000000));
+                } while (usedContacts.contains(contact));
+                usedContacts.add(contact);
                 student.setContactNumber(contact);
                 
-                // Parent/Guardian information
-                String parentFirstName = firstNames[random.nextInt(firstNames.length)];
-                String parentLastName = lastNames[random.nextInt(lastNames.length)];
+                // Parent/Guardian information (all required)
+                String parentFirstName = firstNames[(i + 5) % firstNames.length];
+                String parentLastName = lastNames[(i + 3) % lastNames.length];
                 student.setParentGuardianName(parentFirstName + " " + parentLastName);
-                String parentContact = "09" + String.format("%09d", random.nextInt(1000000000));
+                
+                // Parent contact (must be different from student contact)
+                String parentContact;
+                do {
+                    parentContact = "09" + String.format("%09d", 100000000 + random.nextInt(900000000));
+                } while (usedContacts.contains(parentContact) || parentContact.equals(contact));
+                usedContacts.add(parentContact);
                 student.setParentGuardianContact(parentContact);
-                student.setParentGuardianRelationship(relationships[random.nextInt(relationships.length)]);
+                student.setParentGuardianRelationship(relationships[i % relationships.length]);
                 
                 // Grade level (required field - 11 or 12)
-                int gradeLevel = random.nextBoolean() ? 11 : 12;
+                int gradeLevel = (i < 15) ? 11 : 12; // First 15 are Grade 11, next 15 are Grade 12
                 student.setGradeLevel(gradeLevel);
                 
-                // Strand
-                student.setStrand(strands[random.nextInt(strands.length)]);
+                // Strand (required - use active strands only)
+                Strand selectedStrand = activeStrands.get(i % activeStrands.size());
+                student.setStrand(selectedStrand.getName());
                 
-                // Previous school
-                student.setPreviousSchool(previousSchools[random.nextInt(previousSchools.length)]);
+                // Previous school (required, spelled out)
+                student.setPreviousSchool(previousSchools[i % previousSchools.length]);
                 
-                // GWA (between 75.0 and 98.0)
-                double gwa = 75.0 + (random.nextDouble() * 23.0);
+                // GWA (required, between 75.0 and 100.0)
+                double gwa = 75.0 + (random.nextDouble() * 25.0);
                 student.setGwa(Math.round(gwa * 100.0) / 100.0);
                 
-                // LRN (optional - 12 digits, some students may not have it)
-                if (random.nextDouble() > 0.2) { // 80% chance of having LRN
-                    String lrn = String.format("%012d", random.nextInt(1000000000));
-                    student.setLrn(lrn);
+                // LRN (required, exactly 12 digits, must be unique)
+                String lrn;
+                do {
+                    lrn = String.format("%012d", 100000000000L + random.nextInt(900000000));
+                } while (usedLrns.contains(lrn));
+                usedLrns.add(lrn);
+                student.setLrn(lrn);
+                
+                // Enrollment status (required - Enrolled or Pending)
+                // First 20 students are Enrolled, last 10 are Pending
+                String enrollmentStatus = (i < 20) ? "Enrolled" : "Pending";
+                student.setEnrollmentStatus(enrollmentStatus);
+                
+                // Section assignment (required if Enrolled)
+                if ("Enrolled".equals(enrollmentStatus)) {
+                    // Find all sections matching the strand and grade level
+                    java.util.List<Section> matchingSections = activeSections.stream()
+                            .filter(s -> selectedStrand.getName().equals(s.getStrand()) 
+                                    && gradeLevel == s.getGradeLevel())
+                            .collect(java.util.stream.Collectors.toList());
+                    
+                    if (!matchingSections.isEmpty()) {
+                        // Distribute students across available sections
+                        Section assignedSection = matchingSections.get(enrolledCount % matchingSections.size());
+                        student.setSection(assignedSection);
+                        enrolledCount++;
+                    } else {
+                        // If no matching section found, set status to Pending
+                        student.setEnrollmentStatus("Pending");
+                        student.setSection(null);
+                        pendingCount++;
+                    }
+                } else {
+                    student.setSection(null);
+                    pendingCount++;
                 }
                 
-                // Enrollment status (required field)
-                student.setEnrollmentStatus(enrollmentStatuses[random.nextInt(enrollmentStatuses.length)]);
+                // Ensure not archived
+                student.setIsArchived(false);
                 
                 studentRepository.save(student);
                 successCount++;
             } catch (Exception e) {
                 System.err.println("⚠ Error creating student " + (i + 1) + ": " + e.getMessage());
+                e.printStackTrace();
             }
         }
         
         System.out.println("✓ Successfully created " + successCount + " test student records");
+        System.out.println("  - Enrolled: " + enrolledCount + " students (with sections assigned)");
+        System.out.println("  - Pending: " + pendingCount + " students (no section assigned)");
     }
 }
