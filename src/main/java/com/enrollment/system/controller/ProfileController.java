@@ -30,10 +30,28 @@ public class ProfileController {
     private PasswordField txtCurrentPassword;
     
     @FXML
+    private TextField txtCurrentPasswordVisible;
+    
+    @FXML
+    private Button btnToggleCurrentPassword;
+    
+    @FXML
     private PasswordField txtNewPassword;
     
     @FXML
+    private TextField txtNewPasswordVisible;
+    
+    @FXML
+    private Button btnToggleNewPassword;
+    
+    @FXML
     private PasswordField txtConfirmPassword;
+    
+    @FXML
+    private TextField txtConfirmPasswordVisible;
+    
+    @FXML
+    private Button btnToggleConfirmPassword;
     
     @FXML
     private Label lblPasswordError;
@@ -53,9 +71,51 @@ public class ProfileController {
     private UserDto currentUser;
     private String sessionToken;
     
+    private boolean currentPasswordVisible = false;
+    private boolean newPasswordVisible = false;
+    private boolean confirmPasswordVisible = false;
+    
     @FXML
     public void initialize() {
         hideMessages();
+        
+        // Sync password fields - PasswordField to TextField
+        txtCurrentPassword.textProperty().addListener((obs, oldText, newText) -> {
+            if (!currentPasswordVisible) {
+                txtCurrentPasswordVisible.setText(newText);
+            }
+        });
+        
+        txtNewPassword.textProperty().addListener((obs, oldText, newText) -> {
+            if (!newPasswordVisible) {
+                txtNewPasswordVisible.setText(newText);
+            }
+        });
+        
+        txtConfirmPassword.textProperty().addListener((obs, oldText, newText) -> {
+            if (!confirmPasswordVisible) {
+                txtConfirmPasswordVisible.setText(newText);
+            }
+        });
+        
+        // Sync password fields - TextField to PasswordField
+        txtCurrentPasswordVisible.textProperty().addListener((obs, oldText, newText) -> {
+            if (currentPasswordVisible) {
+                txtCurrentPassword.setText(newText);
+            }
+        });
+        
+        txtNewPasswordVisible.textProperty().addListener((obs, oldText, newText) -> {
+            if (newPasswordVisible) {
+                txtNewPassword.setText(newText);
+            }
+        });
+        
+        txtConfirmPasswordVisible.textProperty().addListener((obs, oldText, newText) -> {
+            if (confirmPasswordVisible) {
+                txtConfirmPassword.setText(newText);
+            }
+        });
     }
     
     public void setUserSession(UserDto user, String token) {
@@ -83,12 +143,81 @@ public class ProfileController {
     }
     
     @FXML
+    private void toggleCurrentPasswordVisibility() {
+        currentPasswordVisible = !currentPasswordVisible;
+        
+        if (currentPasswordVisible) {
+            String currentPassword = txtCurrentPassword.getText();
+            txtCurrentPasswordVisible.setText(currentPassword);
+            txtCurrentPassword.setVisible(false);
+            txtCurrentPassword.setManaged(false);
+            txtCurrentPasswordVisible.setVisible(true);
+            txtCurrentPasswordVisible.setManaged(true);
+            btnToggleCurrentPassword.setText("🙈");
+        } else {
+            String currentPassword = txtCurrentPasswordVisible.getText();
+            txtCurrentPassword.setText(currentPassword);
+            txtCurrentPasswordVisible.setVisible(false);
+            txtCurrentPasswordVisible.setManaged(false);
+            txtCurrentPassword.setVisible(true);
+            txtCurrentPassword.setManaged(true);
+            btnToggleCurrentPassword.setText("👁️");
+        }
+    }
+    
+    @FXML
+    private void toggleNewPasswordVisibility() {
+        newPasswordVisible = !newPasswordVisible;
+        
+        if (newPasswordVisible) {
+            String newPassword = txtNewPassword.getText();
+            txtNewPasswordVisible.setText(newPassword);
+            txtNewPassword.setVisible(false);
+            txtNewPassword.setManaged(false);
+            txtNewPasswordVisible.setVisible(true);
+            txtNewPasswordVisible.setManaged(true);
+            btnToggleNewPassword.setText("🙈");
+        } else {
+            String newPassword = txtNewPasswordVisible.getText();
+            txtNewPassword.setText(newPassword);
+            txtNewPasswordVisible.setVisible(false);
+            txtNewPasswordVisible.setManaged(false);
+            txtNewPassword.setVisible(true);
+            txtNewPassword.setManaged(true);
+            btnToggleNewPassword.setText("👁️");
+        }
+    }
+    
+    @FXML
+    private void toggleConfirmPasswordVisibility() {
+        confirmPasswordVisible = !confirmPasswordVisible;
+        
+        if (confirmPasswordVisible) {
+            String confirmPassword = txtConfirmPassword.getText();
+            txtConfirmPasswordVisible.setText(confirmPassword);
+            txtConfirmPassword.setVisible(false);
+            txtConfirmPassword.setManaged(false);
+            txtConfirmPasswordVisible.setVisible(true);
+            txtConfirmPasswordVisible.setManaged(true);
+            btnToggleConfirmPassword.setText("🙈");
+        } else {
+            String confirmPassword = txtConfirmPasswordVisible.getText();
+            txtConfirmPassword.setText(confirmPassword);
+            txtConfirmPasswordVisible.setVisible(false);
+            txtConfirmPasswordVisible.setManaged(false);
+            txtConfirmPassword.setVisible(true);
+            txtConfirmPassword.setManaged(true);
+            btnToggleConfirmPassword.setText("👁️");
+        }
+    }
+    
+    @FXML
     private void handleChangePassword() {
         hideMessages();
         
-        String currentPassword = txtCurrentPassword.getText();
-        String newPassword = txtNewPassword.getText();
-        String confirmPassword = txtConfirmPassword.getText();
+        String currentPassword = currentPasswordVisible ? txtCurrentPasswordVisible.getText() : txtCurrentPassword.getText();
+        String newPassword = newPasswordVisible ? txtNewPasswordVisible.getText() : txtNewPassword.getText();
+        String confirmPassword = confirmPasswordVisible ? txtConfirmPasswordVisible.getText() : txtConfirmPassword.getText();
         
         // Validation
         if (currentPassword.isEmpty() || newPassword.isEmpty() || confirmPassword.isEmpty()) {
@@ -152,8 +281,11 @@ public class ProfileController {
     
     private void clearPasswordFields() {
         txtCurrentPassword.clear();
+        txtCurrentPasswordVisible.clear();
         txtNewPassword.clear();
+        txtNewPasswordVisible.clear();
         txtConfirmPassword.clear();
+        txtConfirmPasswordVisible.clear();
     }
     
     private void showError(String message) {

@@ -3,6 +3,7 @@ package com.enrollment.system.controller;
 import com.enrollment.system.dto.UserDto;
 import com.enrollment.system.dto.StudentDto;
 import com.enrollment.system.service.StudentService;
+import com.enrollment.system.service.AuthService;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -105,12 +106,16 @@ public class DashboardController {
     @Autowired(required = false)
     private com.enrollment.system.repository.StudentRepository studentRepository;
     
+    @Autowired(required = false)
+    private AuthService authService;
+    
     private UserDto currentUser;
     private String sessionToken;
     private boolean studentManagementExpanded = false;
     private boolean reportsExpanded = false;
     private boolean settingsExpanded = false;
     private boolean userAccountsExpanded = false;
+    private Stage loginStage; // Reference to login stage
     
     @FXML
     public void initialize() {
@@ -169,6 +174,24 @@ public class DashboardController {
         } catch (Exception e) {
             System.err.println("Warning: Error setting up submenu button hover effects: " + e.getMessage());
         }
+        
+        // Logout button hover effect
+        try {
+            if (logoutButton != null) {
+                String logoutHoverStyle = "-fx-background-color: #c0392b; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 12 30; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(231,76,60,0.5), 12, 0, 0, 3); -fx-translate-y: -2;";
+                final String[] originalLogoutStyle = {logoutButton.getStyle()};
+                
+                logoutButton.setOnMouseEntered(e -> {
+                    originalLogoutStyle[0] = logoutButton.getStyle();
+                    logoutButton.setStyle(logoutHoverStyle);
+                });
+                logoutButton.setOnMouseExited(e -> {
+                    logoutButton.setStyle(originalLogoutStyle[0]);
+                });
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Error setting up logout button hover effect: " + e.getMessage());
+        }
     }
     
     private void setupMainButtonHover(Button button, String hoverColor) {
@@ -223,6 +246,27 @@ public class DashboardController {
             adminSection.setManaged(false);
         }
         
+        // Set up close handler to show login when dashboard closes
+        // Use Platform.runLater to ensure scene is attached
+        Platform.runLater(() -> {
+            try {
+                Stage dashboardStage = (Stage) (userNameLabel != null && userNameLabel.getScene() != null ? userNameLabel.getScene().getWindow() : null);
+                if (dashboardStage != null) {
+                    dashboardStage.setOnCloseRequest(event -> {
+                        // When dashboard closes, show login again
+                        if (loginStage != null) {
+                            loginStage.show();
+                        } else {
+                            // If login stage reference is lost, create a new login window
+                            loadLoginPage();
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                // Ignore if scene is not yet available
+            }
+        });
+        
         // Load dashboard statistics after user session is set
         // Use Platform.runLater to ensure UI is ready
         Platform.runLater(() -> {
@@ -233,6 +277,10 @@ public class DashboardController {
                 e.printStackTrace();
             }
         });
+    }
+    
+    public void setLoginStage(Stage loginStage) {
+        this.loginStage = loginStage;
     }
     
     
@@ -712,10 +760,78 @@ public class DashboardController {
         
         alert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
-                Stage stage = (Stage) logoutButton.getScene().getWindow();
-                stage.close();
+                try {
+                    // Invalidate session
+                    if (sessionToken != null) {
+                        try {
+                            authService.logout(sessionToken);
+                        } catch (Exception e) {
+                            // Log but don't block logout
+                            e.printStackTrace();
+                        }
+                    }
+                    
+                    // Close dashboard stage
+                    Stage dashboardStage = (Stage) logoutButton.getScene().getWindow();
+                    dashboardStage.close();
+                    
+                    // Show login page (either existing hidden one or create new)
+                    if (loginStage != null) {
+                        loginStage.show();
+                        // Clear login fields
+                        clearLoginFields();
+                    } else {
+                        loadLoginPage();
+                    }
+                    
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                    errorAlert.setTitle("Logout Error");
+                    errorAlert.setHeaderText("Failed to logout");
+                    errorAlert.setContentText("Error: " + e.getMessage());
+                    errorAlert.showAndWait();
+                }
             }
         });
+    }
+    
+    private void loadLoginPage() {
+        try {
+            // Load Login FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/login.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent loginRoot = loader.load();
+            
+            // Create new stage for login
+            Stage newLoginStage = new Stage();
+            newLoginStage.setTitle("Seguinon SASHS - Login");
+            newLoginStage.setScene(new Scene(loginRoot));
+            newLoginStage.setResizable(false);
+            newLoginStage.centerOnScreen();
+            newLoginStage.setWidth(900);
+            newLoginStage.setHeight(600);
+            
+            // Store reference
+            this.loginStage = newLoginStage;
+            
+            // Show login page
+            newLoginStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load login page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
+    }
+    
+    private void clearLoginFields() {
+        // This will be called when showing existing login stage
+        // The login controller will handle clearing fields in its initialize or we can access it
+        // For now, we'll rely on the login window being reset when shown
     }
     
     private void resetMainButtonStyles() {

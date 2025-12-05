@@ -65,23 +65,53 @@
                         <!-- Current Password -->
                         <VBox spacing="5">
                             <Label text="Current Password *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #7f8c8d;"/>
-                            <PasswordField fx:id="txtCurrentPassword" promptText="Enter your current password" 
-                                         style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5;"/>
+                            <HBox spacing="0" alignment="CENTER_LEFT">
+                                <PasswordField fx:id="txtCurrentPassword" promptText="Enter your current password" 
+                                             HBox.hgrow="ALWAYS"
+                                             style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5 0 0 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5 0 0 5; -fx-border-width: 1;"/>
+                                <TextField fx:id="txtCurrentPasswordVisible" promptText="Enter your current password" 
+                                         HBox.hgrow="ALWAYS"
+                                         visible="false" managed="false"
+                                         style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5 0 0 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5 0 0 5; -fx-border-width: 1;"/>
+                                <Button fx:id="btnToggleCurrentPassword" text="👁️" onAction="#toggleCurrentPasswordVisibility"
+                                        style="-fx-background-color: #ecf0f1; -fx-text-fill: #2c3e50; -fx-background-radius: 0 5 5 0; -fx-border-color: #bdc3c7; -fx-border-width: 1 1 1 0; -fx-border-radius: 0 5 5 0; -fx-cursor: hand; -fx-padding: 10 12; -fx-font-size: 14px;"
+                                        prefWidth="40"/>
+                            </HBox>
                         </VBox>
                         
                         <!-- New Password -->
                         <VBox spacing="5">
                             <Label text="New Password *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #7f8c8d;"/>
-                            <PasswordField fx:id="txtNewPassword" promptText="Enter your new password" 
-                                         style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5;"/>
+                            <HBox spacing="0" alignment="CENTER_LEFT">
+                                <PasswordField fx:id="txtNewPassword" promptText="Enter your new password" 
+                                             HBox.hgrow="ALWAYS"
+                                             style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5 0 0 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5 0 0 5; -fx-border-width: 1;"/>
+                                <TextField fx:id="txtNewPasswordVisible" promptText="Enter your new password" 
+                                         HBox.hgrow="ALWAYS"
+                                         visible="false" managed="false"
+                                         style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5 0 0 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5 0 0 5; -fx-border-width: 1;"/>
+                                <Button fx:id="btnToggleNewPassword" text="👁️" onAction="#toggleNewPasswordVisibility"
+                                        style="-fx-background-color: #ecf0f1; -fx-text-fill: #2c3e50; -fx-background-radius: 0 5 5 0; -fx-border-color: #bdc3c7; -fx-border-width: 1 1 1 0; -fx-border-radius: 0 5 5 0; -fx-cursor: hand; -fx-padding: 10 12; -fx-font-size: 14px;"
+                                        prefWidth="40"/>
+                            </HBox>
                             <Label text="Password must be at least 8 characters long" style="-fx-font-size: 11px; -fx-text-fill: #95a5a6;"/>
                         </VBox>
                         
                         <!-- Confirm New Password -->
                         <VBox spacing="5">
                             <Label text="Confirm New Password *" style="-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #7f8c8d;"/>
-                            <PasswordField fx:id="txtConfirmPassword" promptText="Confirm your new password" 
-                                         style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5;"/>
+                            <HBox spacing="0" alignment="CENTER_LEFT">
+                                <PasswordField fx:id="txtConfirmPassword" promptText="Confirm your new password" 
+                                             HBox.hgrow="ALWAYS"
+                                             style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5 0 0 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5 0 0 5; -fx-border-width: 1;"/>
+                                <TextField fx:id="txtConfirmPasswordVisible" promptText="Confirm your new password" 
+                                         HBox.hgrow="ALWAYS"
+                                         visible="false" managed="false"
+                                         style="-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 5 0 0 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5 0 0 5; -fx-border-width: 1;"/>
+                                <Button fx:id="btnToggleConfirmPassword" text="👁️" onAction="#toggleConfirmPasswordVisibility"
+                                        style="-fx-background-color: #ecf0f1; -fx-text-fill: #2c3e50; -fx-background-radius: 0 5 5 0; -fx-border-color: #bdc3c7; -fx-border-width: 1 1 1 0; -fx-border-radius: 0 5 5 0; -fx-cursor: hand; -fx-padding: 10 12; -fx-font-size: 14px;"
+                                        prefWidth="40"/>
+                            </HBox>
                         </VBox>
                         
                         <!-- Error Message -->

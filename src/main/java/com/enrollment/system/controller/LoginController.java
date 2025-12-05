@@ -24,6 +24,12 @@ public class LoginController {
     private PasswordField passwordField;
     
     @FXML
+    private TextField passwordVisibleField;
+    
+    @FXML
+    private Button btnTogglePassword;
+    
+    @FXML
     private Button loginButton;
     
     @FXML
@@ -31,6 +37,8 @@ public class LoginController {
     
     @FXML
     private ProgressIndicator loadingIndicator;
+    
+    private boolean passwordVisible = false;
 
     @Autowired
     private AuthService authService;
@@ -45,14 +53,94 @@ public class LoginController {
         errorLabel.setVisible(false);
         loadingIndicator.setVisible(false);
         
-        // Add enter key listener to password field
+        // Add enter key listener to password fields
         passwordField.setOnAction(event -> handleLogin());
+        passwordVisibleField.setOnAction(event -> handleLogin());
+        
+        // Sync password fields
+        passwordField.textProperty().addListener((obs, oldText, newText) -> {
+            if (!passwordVisible) {
+                passwordVisibleField.setText(newText);
+            }
+        });
+        
+        passwordVisibleField.textProperty().addListener((obs, oldText, newText) -> {
+            if (passwordVisible) {
+                passwordField.setText(newText);
+            }
+        });
+        
+        // Set up window shown handler after scene is attached
+        Platform.runLater(() -> {
+            try {
+                Stage stage = (Stage) (usernameField != null && usernameField.getScene() != null ? usernameField.getScene().getWindow() : null);
+                if (stage != null) {
+                    stage.setOnShown(event -> {
+                        clearFields();
+                    });
+                }
+            } catch (Exception e) {
+                // Ignore if scene is not yet available
+            }
+        });
+    }
+    
+    public void clearFields() {
+        if (usernameField != null) {
+            usernameField.clear();
+        }
+        if (passwordField != null) {
+            passwordField.clear();
+        }
+        if (passwordVisibleField != null) {
+            passwordVisibleField.clear();
+        }
+        if (errorLabel != null) {
+            hideError();
+        }
+        passwordVisible = false;
+        if (btnTogglePassword != null) {
+            btnTogglePassword.setText("🔍");
+        }
+        if (passwordVisibleField != null && passwordVisibleField.isVisible()) {
+            passwordVisibleField.setVisible(false);
+            passwordVisibleField.setManaged(false);
+        }
+        if (passwordField != null && !passwordField.isVisible()) {
+            passwordField.setVisible(true);
+            passwordField.setManaged(true);
+        }
     }
 
     @FXML
+    private void togglePasswordVisibility() {
+        passwordVisible = !passwordVisible;
+        
+        if (passwordVisible) {
+            // Show text field, hide password field
+            String currentPassword = passwordField.getText();
+            passwordVisibleField.setText(currentPassword);
+            passwordField.setVisible(false);
+            passwordField.setManaged(false);
+            passwordVisibleField.setVisible(true);
+            passwordVisibleField.setManaged(true);
+            btnTogglePassword.setText("🕵️");
+        } else {
+            // Show password field, hide text field
+            String currentPassword = passwordVisibleField.getText();
+            passwordField.setText(currentPassword);
+            passwordVisibleField.setVisible(false);
+            passwordVisibleField.setManaged(false);
+            passwordField.setVisible(true);
+            passwordField.setManaged(true);
+            btnTogglePassword.setText("🔍");
+        }
+    }
+    
+    @FXML
     private void handleLogin() {
         String username = usernameField.getText().trim();
-        String password = passwordField.getText();
+        String password = passwordVisible ? passwordVisibleField.getText() : passwordField.getText();
 
         // Validation
         if (username.isEmpty() || password.isEmpty()) {
@@ -127,13 +215,32 @@ public class LoginController {
             
             // Create new stage for dashboard
             Stage dashboardStage = new Stage();
-            dashboardStage.setTitle("Seguinon SHS Enrollment System - Dashboard");
+            dashboardStage.setTitle("Seguinon SASHS Enrollment System - Dashboard");
             dashboardStage.setScene(new Scene(dashboardRoot));
             dashboardStage.setMaximized(true);
             
-            // Close login window
+            // Hide login window instead of closing (to prevent app shutdown)
             Stage loginStage = (Stage) loginButton.getScene().getWindow();
-            loginStage.close();
+            loginStage.hide();
+            
+            // Store login stage reference in dashboard controller
+            if (dashboardController != null) {
+                dashboardController.setLoginStage(loginStage);
+            }
+            
+            // Set dashboard to show login when closed via X button
+            dashboardStage.setOnCloseRequest(event -> {
+                // When dashboard closes, show login again and clear fields
+                loginStage.show();
+                usernameField.clear();
+                passwordField.clear();
+                passwordVisibleField.clear();
+                passwordVisible = false;
+                if (passwordVisibleField.isVisible()) {
+                    togglePasswordVisibility();
+                }
+                hideError();
+            });
             
             // Show dashboard
             dashboardStage.show();
@@ -165,6 +272,8 @@ public class LoginController {
         loginButton.setDisable(loading);
         usernameField.setDisable(loading);
         passwordField.setDisable(loading);
+        passwordVisibleField.setDisable(loading);
+        btnTogglePassword.setDisable(loading);
     }
     
     @FXML
