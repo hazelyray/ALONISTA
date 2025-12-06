@@ -72,7 +72,7 @@
                             style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
                     <Button fx:id="btnEnrollmentSummary" text="  📑 Enrollment Summary" onAction="#showEnrollmentSummary"
                             style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
-                    <Button fx:id="btnArchiveStudents" text="  📦 Archive Students" onAction="#showArchiveStudents"
+                    <Button fx:id="btnArchiveStudents" text="  📦 STUDENT LOGS" onAction="#showArchiveStudents"
                             style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
                 </VBox>
             </VBox>

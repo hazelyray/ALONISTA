@@ -2,6 +2,8 @@ package com.enrollment.system.controller;
 
 import com.enrollment.system.dto.StudentDto;
 import com.enrollment.system.service.StudentService;
+import com.enrollment.system.service.SemesterService;
+import com.enrollment.system.dto.SemesterDto;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -22,6 +24,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.ResourceBundle;
 
 @Component
@@ -55,6 +61,9 @@ public class ViewStudentsController implements Initializable {
     private TableColumn<StudentDto, String> sectionColumn;
     
     @FXML
+    private TableColumn<StudentDto, String> semesterColumn;
+    
+    @FXML
     private TableColumn<StudentDto, String> lrnColumn;
     
     @FXML
@@ -82,6 +91,12 @@ public class ViewStudentsController implements Initializable {
     private ComboBox<String> enrollmentStatusFilterComboBox;
     
     @FXML
+    private ComboBox<String> semesterFilterComboBox;
+    
+    @FXML
+    private ComboBox<String> sectionFilterComboBox;
+    
+    @FXML
     private Label studentCountLabel;
     
     
@@ -94,8 +109,16 @@ public class ViewStudentsController implements Initializable {
     @Autowired
     private ApplicationContext applicationContext;
     
+    @Autowired(required = false)
+    private SemesterService semesterService;
+    
     private ObservableList<StudentDto> studentList;
     private FilteredList<StudentDto> filteredList;
+    
+    // Semester mapping: displayName -> semesterId (for filtering)
+    private Map<String, Long> semesterFilterMap = new HashMap<>();
+    // Additional mapping: displayName -> list of all semester IDs (for same display name across grade levels)
+    private Map<String, List<Long>> semesterIdsByDisplayNameMap = new HashMap<>();
     
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -103,6 +126,10 @@ public class ViewStudentsController implements Initializable {
         gradeFilterComboBox.getItems().addAll(null, 11, 12);
         strandFilterComboBox.getItems().addAll(null, "ABM", "HUMSS", "STEM", "GAS", "TVL");
         enrollmentStatusFilterComboBox.getItems().addAll(null, "Enrolled", "Pending");
+        sectionFilterComboBox.getItems().add(null); // Will be populated dynamically
+        
+        // Load semesters for filter dropdown
+        loadSemestersForFilter();
         
         // Initialize table columns with null-safe cell value factories
         idColumn.setCellValueFactory(new PropertyValueFactory<>("id"));
@@ -151,6 +178,23 @@ public class ViewStudentsController implements Initializable {
         sectionColumn.setCellValueFactory(cellData -> {
             String sectionName = cellData.getValue().getSectionName();
             return new SimpleStringProperty(sectionName != null ? sectionName : "N/A");
+        });
+        
+        // Semester column - show semester for enrolled students, N/A for others
+        semesterColumn.setCellValueFactory(cellData -> {
+            StudentDto student = cellData.getValue();
+            String enrollmentStatus = student.getEnrollmentStatus();
+            if ("Enrolled".equals(enrollmentStatus)) {
+                String semesterDisplay = student.getSemesterDisplayName();
+                if (semesterDisplay != null && !semesterDisplay.isEmpty()) {
+                    return new SimpleStringProperty(semesterDisplay);
+                } else {
+                    String semesterName = student.getSemesterName();
+                    return new SimpleStringProperty(semesterName != null ? semesterName : "N/A");
+                }
+            } else {
+                return new SimpleStringProperty("N/A");
+            }
         });
         
         lrnColumn.setCellValueFactory(cellData -> {
@@ -211,14 +255,21 @@ public class ViewStudentsController implements Initializable {
             }
         });
         
-        // Ensure table is properly initialized
+        // Ensure table is properly initialized with proper placeholder
         if (studentsTable != null) {
-            studentsTable.setPlaceholder(new Label("Loading students..."));
+            Label emptyPlaceholder = new Label("No students found.");
+            emptyPlaceholder.setStyle("-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-padding: 20;");
+            studentsTable.setPlaceholder(emptyPlaceholder);
         }
         
-        // Load students after a short delay to ensure UI is ready
+        // Load semesters first, then students to ensure semester map is ready
         Platform.runLater(() -> {
-            loadStudents();
+            // Load semesters first so the map is ready when students are loaded
+            loadSemestersForFilter();
+            // Small delay to ensure semester map is populated before loading students
+            Platform.runLater(() -> {
+                loadStudents();
+            });
         });
     }
     
@@ -228,6 +279,13 @@ public class ViewStudentsController implements Initializable {
     }
     
     private void loadStudents() {
+        // Show loading placeholder while loading
+        if (studentsTable != null) {
+            Label loadingPlaceholder = new Label("Loading students...");
+            loadingPlaceholder.setStyle("-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-padding: 20;");
+            studentsTable.setPlaceholder(loadingPlaceholder);
+        }
+        
         Platform.runLater(() -> {
             try {
                 // Load students from service
@@ -246,6 +304,17 @@ public class ViewStudentsController implements Initializable {
                 // Set table items
                 studentsTable.setItems(sortedList);
                 
+                // Update section filter options based on loaded students
+                updateSectionFilterOptions(students);
+                
+                // Don't apply filters immediately - let user set filters manually
+                // This avoids issues with semester map not being ready
+                
+                // Update placeholder to show "No students found" when empty
+                Label emptyPlaceholder = new Label("No students found.");
+                emptyPlaceholder.setStyle("-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-padding: 20;");
+                studentsTable.setPlaceholder(emptyPlaceholder);
+                
                 // Update count
                 updateStudentCount();
                 
@@ -256,6 +325,12 @@ public class ViewStudentsController implements Initializable {
                 studentList = FXCollections.observableArrayList();
                 filteredList = new FilteredList<>(studentList, p -> true);
                 studentsTable.setItems(new SortedList<>(filteredList));
+                
+                // Set empty placeholder
+                Label emptyPlaceholder = new Label("No students found.");
+                emptyPlaceholder.setStyle("-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-padding: 20;");
+                studentsTable.setPlaceholder(emptyPlaceholder);
+                
                 updateStudentCount();
             }
         });
@@ -264,10 +339,13 @@ public class ViewStudentsController implements Initializable {
     @FXML
     private void handleRefresh() {
         loadStudents();
+        loadSemestersForFilter(); // Reload semesters in case current school year changed
         searchField.clear();
         gradeFilterComboBox.setValue(null);
         strandFilterComboBox.setValue(null);
         enrollmentStatusFilterComboBox.setValue(null);
+        semesterFilterComboBox.setValue(null);
+        sectionFilterComboBox.setValue(null);
     }
     
     @FXML
@@ -281,34 +359,250 @@ public class ViewStudentsController implements Initializable {
     }
     
     private void applyFilters() {
-        String searchText = searchField.getText().toLowerCase();
-        Integer gradeFilter = gradeFilterComboBox.getValue();
-        String strandFilter = strandFilterComboBox.getValue();
-        String enrollmentStatusFilter = enrollmentStatusFilterComboBox.getValue();
+        if (filteredList == null) {
+            return;
+        }
+        
+        String searchText = searchField != null ? searchField.getText().trim().toLowerCase() : "";
+        Integer gradeFilter = gradeFilterComboBox != null ? gradeFilterComboBox.getValue() : null;
+        String strandFilter = strandFilterComboBox != null ? strandFilterComboBox.getValue() : null;
+        String enrollmentStatusFilter = enrollmentStatusFilterComboBox != null ? enrollmentStatusFilterComboBox.getValue() : null;
+        String semesterFilter = semesterFilterComboBox != null ? semesterFilterComboBox.getValue() : null;
+        String sectionFilter = sectionFilterComboBox != null ? sectionFilterComboBox.getValue() : null;
+        
+        // Check if semester filter is set and if map has the value
+        // If not in map, clear the filter to avoid breaking other filters
+        if (semesterFilter != null && !semesterFilter.isEmpty()) {
+            if (!semesterFilterMap.containsKey(semesterFilter)) {
+                System.err.println("ViewStudentsController: Semester filter '" + semesterFilter + "' not in map!");
+                System.err.println("ViewStudentsController: Available keys: " + semesterFilterMap.keySet());
+                // Don't apply semester filter if not in map - allow other filters to work
+                semesterFilter = null;
+            }
+        }
+        
+        // Create final variable for use in lambda
+        final String finalSemesterFilter = semesterFilter;
         
         filteredList.setPredicate(student -> {
-            // Search filter
-            boolean matchesSearch = searchText.isEmpty() ||
-                    (student.getName() != null && student.getName().toLowerCase().contains(searchText)) ||
-                    (student.getLrn() != null && student.getLrn().toLowerCase().contains(searchText)) ||
-                    (student.getContactNumber() != null && student.getContactNumber().contains(searchText));
+            if (student == null) {
+                return false;
+            }
             
-            // Grade filter
-            boolean matchesGrade = gradeFilter == null || 
-                    (student.getGradeLevel() != null && student.getGradeLevel().equals(gradeFilter));
+            // Search filter - must match if search text is provided
+            boolean matchesSearch = true;
+            if (!searchText.isEmpty()) {
+                matchesSearch = false;
+                // Check name
+                if (student.getName() != null && student.getName().toLowerCase().contains(searchText)) {
+                    matchesSearch = true;
+                }
+                // Check LRN
+                if (!matchesSearch && student.getLrn() != null && student.getLrn().toLowerCase().contains(searchText)) {
+                    matchesSearch = true;
+                }
+                // Check contact number
+                if (!matchesSearch && student.getContactNumber() != null && student.getContactNumber().contains(searchText)) {
+                    matchesSearch = true;
+                }
+                // Check section name
+                if (!matchesSearch && student.getSectionName() != null && student.getSectionName().toLowerCase().contains(searchText)) {
+                    matchesSearch = true;
+                }
+            }
             
-            // Strand filter
-            boolean matchesStrand = strandFilter == null || 
-                    (student.getStrand() != null && student.getStrand().equals(strandFilter));
+            if (!matchesSearch) {
+                return false;
+            }
             
-            // Enrollment Status filter
-            boolean matchesEnrollmentStatus = enrollmentStatusFilter == null || 
-                    (student.getEnrollmentStatus() != null && student.getEnrollmentStatus().equals(enrollmentStatusFilter));
+            // Grade filter - must match if filter is set
+            if (gradeFilter != null) {
+                if (student.getGradeLevel() == null || !student.getGradeLevel().equals(gradeFilter)) {
+                    return false;
+                }
+            }
             
-            return matchesSearch && matchesGrade && matchesStrand && matchesEnrollmentStatus;
+            // Strand filter - must match if filter is set
+            if (strandFilter != null && !strandFilter.isEmpty()) {
+                if (student.getStrand() == null || !student.getStrand().equals(strandFilter)) {
+                    return false;
+                }
+            }
+            
+            // Enrollment Status filter - must match if filter is set
+            if (enrollmentStatusFilter != null && !enrollmentStatusFilter.isEmpty()) {
+                if (student.getEnrollmentStatus() == null || !student.getEnrollmentStatus().equals(enrollmentStatusFilter)) {
+                    return false;
+                }
+            }
+            
+            // Section filter - must match if filter is set
+            if (sectionFilter != null && !sectionFilter.isEmpty()) {
+                String studentSection = student.getSectionName();
+                // Handle "N/A" case - if filter is set and student has no section, exclude
+                if (studentSection == null || studentSection.isEmpty() || "N/A".equals(studentSection)) {
+                    return false;
+                }
+                if (!studentSection.equals(sectionFilter)) {
+                    return false;
+                }
+            }
+            
+            // Semester filter - must match if filter is set
+            if (finalSemesterFilter != null && !finalSemesterFilter.isEmpty()) {
+                // Get all semester IDs for this display name (handles multiple grade levels with same display name)
+                List<Long> selectedSemesterIds = semesterIdsByDisplayNameMap.get(finalSemesterFilter);
+                if (selectedSemesterIds != null && !selectedSemesterIds.isEmpty()) {
+                    // Only enrolled students have semesters
+                    // If student is enrolled, check if semester matches
+                    if ("Enrolled".equals(student.getEnrollmentStatus())) {
+                        // Student is enrolled, so check if semester matches
+                        Long studentSemesterId = student.getSemesterId();
+                        if (studentSemesterId == null) {
+                            // Student is enrolled but has no semester - exclude
+                            return false;
+                        }
+                        // Check if student's semester ID matches any of the selected semester IDs
+                        // This handles cases where multiple grade levels have the same display name
+                        if (!selectedSemesterIds.contains(studentSemesterId)) {
+                            return false;
+                        }
+                    } else {
+                        // Student is not enrolled (e.g., "Pending")
+                        // Non-enrolled students don't have semesters, so exclude them when semester filter is active
+                        return false;
+                    }
+                }
+                // If semesterIds not found in map, skip semester filtering (don't break other filters)
+            }
+            
+            // All filters passed
+            return true;
         });
         
         updateStudentCount();
+    }
+    
+    private void updateSectionFilterOptions(List<StudentDto> students) {
+        if (sectionFilterComboBox == null) {
+            return;
+        }
+        
+        // Get unique section names from students
+        java.util.Set<String> sectionNames = new java.util.HashSet<>();
+        for (StudentDto student : students) {
+            String sectionName = student.getSectionName();
+            if (sectionName != null && !sectionName.isEmpty() && !"N/A".equals(sectionName)) {
+                sectionNames.add(sectionName);
+            }
+        }
+        
+        // Sort section names
+        java.util.List<String> sortedSections = new java.util.ArrayList<>(sectionNames);
+        java.util.Collections.sort(sortedSections);
+        
+        // Update combo box
+        String currentValue = sectionFilterComboBox.getValue();
+        sectionFilterComboBox.getItems().clear();
+        sectionFilterComboBox.getItems().add(null); // Add "All Sections" option
+        sectionFilterComboBox.getItems().addAll(sortedSections);
+        
+        // Restore previous selection if it still exists
+        if (currentValue != null && sortedSections.contains(currentValue)) {
+            sectionFilterComboBox.setValue(currentValue);
+        }
+    }
+    
+    private void loadSemestersForFilter() {
+        if (semesterService == null || semesterFilterComboBox == null) {
+            System.err.println("Warning: SemesterService or semesterFilterComboBox is null in ViewStudentsController");
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                // Only load semesters from CURRENT school year for View Students filter
+                List<SemesterDto> semesters = semesterService.getSemestersForCurrentSchoolYear();
+                
+                System.out.println("ViewStudentsController: Loaded " + semesters.size() + " semesters for current school year filter");
+                
+                Platform.runLater(() -> {
+                    try {
+                        semesterFilterMap.clear();
+                        semesterIdsByDisplayNameMap.clear();
+                        semesterFilterComboBox.getItems().clear();
+                        semesterFilterComboBox.getItems().add(null); // Add "All Semesters" option
+                        
+                        if (semesters.isEmpty()) {
+                            System.err.println("Warning: No semesters found for current school year. Check if semesters exist and school year is set as current.");
+                        }
+                        
+                        // Group semesters by display name (since multiple grade levels can have same display name)
+                        // For filtering, we'll match any semester with the same display name
+                        Map<String, List<Long>> semesterIdsByDisplayName = new HashMap<>();
+                        for (SemesterDto semester : semesters) {
+                            String displayName = semester.getDisplayName();
+                            if (displayName != null && !displayName.isEmpty()) {
+                                semesterIdsByDisplayName.computeIfAbsent(displayName, k -> new ArrayList<>()).add(semester.getId());
+                            }
+                        }
+                        
+                        // Add unique display names to combo box and store all IDs for each display name
+                        for (Map.Entry<String, List<Long>> entry : semesterIdsByDisplayName.entrySet()) {
+                            String displayName = entry.getKey();
+                            List<Long> semesterIds = entry.getValue();
+                            semesterFilterComboBox.getItems().add(displayName);
+                            // Store the first ID (they're all equivalent for filtering purposes - same school year and semester number)
+                            // But we need to check against all IDs when filtering
+                            semesterFilterMap.put(displayName, semesterIds.get(0)); // Store first ID as primary
+                            // Also store all IDs for this display name in a separate map for proper matching
+                            semesterIdsByDisplayNameMap.put(displayName, semesterIds);
+                            System.out.println("ViewStudentsController: Added semester to filter: " + displayName + " (IDs: " + semesterIds + ")");
+                        }
+                        
+                        // Debug: Print all semester mappings
+                        System.out.println("ViewStudentsController: Semester filter map contents:");
+                        for (Map.Entry<String, Long> entry : semesterFilterMap.entrySet()) {
+                            System.out.println("  '" + entry.getKey() + "' -> " + entry.getValue());
+                        }
+                        
+                        // Set cell factory for proper display
+                        semesterFilterComboBox.setCellFactory(listView -> new javafx.scene.control.ListCell<String>() {
+                            @Override
+                            protected void updateItem(String item, boolean empty) {
+                                super.updateItem(item, empty);
+                                if (empty || item == null) {
+                                    setText(null);
+                                } else {
+                                    setText(item);
+                                }
+                            }
+                        });
+                        
+                        // Set button cell factory
+                        semesterFilterComboBox.setButtonCell(new javafx.scene.control.ListCell<String>() {
+                            @Override
+                            protected void updateItem(String item, boolean empty) {
+                                super.updateItem(item, empty);
+                                if (empty || item == null) {
+                                    setText("All Semesters");
+                                } else {
+                                    setText(item);
+                                }
+                            }
+                        });
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        System.err.println("Error populating semester filter: " + e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    System.err.println("Error loading semesters for filter: " + e.getMessage());
+                });
+            }
+        }).start();
     }
     
     private void updateStudentCount() {

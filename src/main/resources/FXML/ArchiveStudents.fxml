@@ -14,7 +14,7 @@
         <VBox spacing="15" style="-fx-padding: 20;">
             <!-- Header -->
             <HBox alignment="CENTER_LEFT" spacing="15">
-                <Label text="Archive Students" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
+                <Label text=" PAST STUDENT LOGS" style="-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;"/>
                 <Region HBox.hgrow="ALWAYS"/>
                 <Button fx:id="refreshButton" text="Refresh" onAction="#handleRefresh" 
                         style="-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 13px; -fx-background-radius: 5; -fx-padding: 8 20; -fx-cursor: hand;"/>

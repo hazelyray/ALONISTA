@@ -53,6 +53,10 @@ public class Student {
     @JoinColumn(name = "school_year_id")
     private SchoolYear schoolYear;
     
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "semester_id")
+    private Semester semester;
+    
     @Column(name = "previous_school", length = 200)
     private String previousSchool;
     
@@ -198,6 +202,14 @@ public class Student {
     
     public void setSchoolYear(SchoolYear schoolYear) {
         this.schoolYear = schoolYear;
+    }
+    
+    public Semester getSemester() {
+        return semester;
+    }
+    
+    public void setSemester(Semester semester) {
+        this.semester = semester;
     }
     
     public String getPreviousSchool() {

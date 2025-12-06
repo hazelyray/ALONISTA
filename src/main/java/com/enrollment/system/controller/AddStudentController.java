@@ -8,6 +8,8 @@ import com.enrollment.system.service.SectionService;
 import com.enrollment.system.service.StrandService;
 import com.enrollment.system.service.StudentService;
 import com.enrollment.system.service.SchoolYearService;
+import com.enrollment.system.service.SemesterService;
+import com.enrollment.system.dto.SemesterDto;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -17,11 +19,15 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.VBox;
+import javafx.scene.control.ScrollPane;
 import javafx.stage.Stage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -76,6 +82,9 @@ public class AddStudentController {
     private ComboBox<String> enrollmentStatusComboBox;
     
     @FXML
+    private ComboBox<String> semesterComboBox;
+    
+    @FXML
     private Label errorLabel;
     
     @FXML
@@ -90,6 +99,9 @@ public class AddStudentController {
     
     @FXML
     private VBox studentSelectionScreen;
+    
+    @FXML
+    private ScrollPane formScrollPane;
     
     @FXML
     private VBox formContainer;
@@ -169,6 +181,16 @@ public class AddStudentController {
     @Autowired(required = false)
     private com.enrollment.system.repository.StudentRepository studentRepository;
     
+    @Autowired(required = false)
+    private SemesterService semesterService;
+    
+    // Semester mapping: displayName -> semesterId
+    private Map<String, Long> semesterMap = new HashMap<>();
+    // School year mapping: semesterId -> schoolYearId
+    private Map<Long, Long> semesterToSchoolYearMap = new HashMap<>();
+    // Store all loaded semesters for filtering
+    private List<SemesterDto> allSemesters = new ArrayList<>();
+    
     // Mode tracking
     private enum Mode { NEW_STUDENT, RE_ENROLL }
     private Mode currentMode = Mode.NEW_STUDENT;
@@ -183,9 +205,13 @@ public class AddStudentController {
             choiceScreen.setVisible(true);
             choiceScreen.setManaged(true);
         }
+        if (formScrollPane != null) {
+            formScrollPane.setVisible(false);
+            formScrollPane.setManaged(false);
+        }
         if (formContainer != null) {
-            formContainer.setVisible(false);
-            formContainer.setManaged(false);
+            formContainer.setVisible(true);
+            formContainer.setManaged(true);
         }
         if (studentSelectionScreen != null) {
             studentSelectionScreen.setVisible(false);
@@ -240,6 +266,9 @@ public class AddStudentController {
         // Set default values
         enrollmentStatusComboBox.setValue("Pending");
         
+        // Load semesters for dropdown (will be filtered by grade level)
+        loadSemesters();
+        
         // Add listener to enrollment status to toggle section requirement and clear section if needed
         enrollmentStatusComboBox.valueProperty().addListener((observable, oldValue, newValue) -> {
             updateSectionRequirement();
@@ -249,9 +278,10 @@ public class AddStudentController {
             }
         });
         
-        // Add listener to grade level to update sections
+        // Add listener to grade level to update sections AND filter semesters
         gradeLevelComboBox.valueProperty().addListener((observable, oldValue, newValue) -> {
             updateSections();
+            updateSemestersByGradeLevel(newValue);
         });
         
         // Add listener to birthdate picker to auto-calculate age
@@ -621,6 +651,12 @@ public class AddStudentController {
             hasErrors = true;
         }
         
+        // Validate semester selection
+        if (semesterComboBox.getValue() == null || semesterComboBox.getValue().isEmpty()) {
+            highlightComboBox(semesterComboBox);
+            hasErrors = true;
+        }
+        
         // Show error message if validation failed
         if (hasErrors) {
             StringBuilder errorMessage = new StringBuilder("Please correct the following errors:\n\n");
@@ -696,6 +732,9 @@ public class AddStudentController {
             if (enrollmentStatusComboBox.getValue() == null || enrollmentStatusComboBox.getValue().isEmpty()) {
                 errorMessage.append("• Enrollment Status is required.\n");
             }
+            if (semesterComboBox.getValue() == null || semesterComboBox.getValue().isEmpty()) {
+                errorMessage.append("• School Year & Semester is required.\n");
+            }
             
             showError(errorMessage.toString());
             return;
@@ -718,19 +757,33 @@ public class AddStudentController {
         if (currentMode == Mode.RE_ENROLL && selectedStudentForReEnrollment != null) {
             Integer currentGrade = selectedStudentForReEnrollment.getGradeLevel();
             Integer newGrade = gradeLevelComboBox.getValue();
+            Long currentSectionId = selectedStudentForReEnrollment.getSectionId();
+            Long newSectionId = sectionComboBox.getValue() != null ? sectionComboBox.getValue().getId() : null;
             
-            // Validate Grade 12 re-enrollment requires reason
+            // Validate Grade 12 re-enrollment: Must have repeater reason
             if (currentGrade != null && currentGrade == 12 && newGrade != null && newGrade == 12) {
                 String reason = reEnrollmentReasonField != null ? reEnrollmentReasonField.getText().trim() : "";
                 if (reason.isEmpty()) {
-                    showError("Re-enrollment reason is required for Grade 12 students. Please provide a reason (e.g., Repeater, Failed subjects, etc.).");
+                    showError("Re-enrollment reason is required for Grade 12 students. Grade 12 students can only re-enroll if they are being marked as a repeater. Please provide a reason (e.g., Repeater, Failed subjects, etc.).");
                     return;
                 }
             }
             
-            // Validate Grade 11 can only be promoted to Grade 12
-            if (currentGrade != null && currentGrade == 11 && (newGrade == null || newGrade != 12)) {
-                showError("Grade 11 students can only be promoted to Grade 12.");
+            // Validate Grade 11 re-enrollment: Cannot re-enroll to same grade and section without reason
+            if (currentGrade != null && currentGrade == 11 && newGrade != null && newGrade == 11) {
+                // Check if trying to re-enroll to the same section
+                if (currentSectionId != null && newSectionId != null && currentSectionId.equals(newSectionId)) {
+                    String reason = reEnrollmentReasonField != null ? reEnrollmentReasonField.getText().trim() : "";
+                    if (reason.isEmpty()) {
+                        showError("Re-enrollment reason is required. Grade 11 students cannot re-enroll into the same grade and section without a validated reason. Please provide a reason for this re-enrollment.");
+                        return;
+                    }
+                }
+            }
+            
+            // Validate Grade 11 can only be promoted to Grade 12 (unless staying in Grade 11 with reason)
+            if (currentGrade != null && currentGrade == 11 && newGrade != null && newGrade != 11 && newGrade != 12) {
+                showError("Grade 11 students can only be promoted to Grade 12 or re-enroll in Grade 11 with a valid reason.");
                 return;
             }
         }
@@ -765,12 +818,55 @@ public class AddStudentController {
         studentDto.setLrn(lrn);
         studentDto.setEnrollmentStatus(enrollmentStatus);
         
-        // Set re-enrollment reason if in re-enrollment mode and Grade 12
+        // Set semester ID and school year ID from selection
+        // Match semester based on display name AND grade level to handle duplicates
+        String selectedSemesterDisplay = semesterComboBox.getValue();
+        Integer selectedGradeLevel = gradeLevelComboBox.getValue();
+        
+        if (selectedSemesterDisplay != null && !selectedSemesterDisplay.isEmpty() && selectedGradeLevel != null) {
+            // Find semester matching both display name and grade level
+            SemesterDto matchedSemester = allSemesters.stream()
+                .filter(s -> selectedSemesterDisplay.equals(s.getDisplayName()) &&
+                            s.getGradeLevel() != null &&
+                            s.getGradeLevel().equals(selectedGradeLevel))
+                .findFirst()
+                .orElse(null);
+            
+            if (matchedSemester != null) {
+                Long semesterId = matchedSemester.getId();
+                studentDto.setSemesterId(semesterId);
+                
+                // Set school year ID from semester mapping
+                if (semesterToSchoolYearMap.containsKey(semesterId)) {
+                    studentDto.setSchoolYearId(semesterToSchoolYearMap.get(semesterId));
+                } else if (matchedSemester.getSchoolYearId() != null) {
+                    studentDto.setSchoolYearId(matchedSemester.getSchoolYearId());
+                }
+            } else {
+                studentDto.setSemesterId(null);
+            }
+        } else {
+            studentDto.setSemesterId(null);
+        }
+        
+        // Set re-enrollment reason if in re-enrollment mode (for Grade 12 or Grade 11 staying in same grade/section)
         if (currentMode == Mode.RE_ENROLL && selectedStudentForReEnrollment != null) {
             Integer currentGrade = selectedStudentForReEnrollment.getGradeLevel();
-            if (currentGrade != null && currentGrade == 12) {
-                String reason = reEnrollmentReasonField != null ? reEnrollmentReasonField.getText().trim() : "";
+            Integer newGrade = gradeLevelComboBox.getValue();
+            Long currentSectionId = selectedStudentForReEnrollment.getSectionId();
+            Long newSectionId = sectionComboBox.getValue() != null ? sectionComboBox.getValue().getId() : null;
+            
+            String reason = reEnrollmentReasonField != null ? reEnrollmentReasonField.getText().trim() : "";
+            
+            // Set reason for Grade 12 re-enrollment (always required)
+            if (currentGrade != null && currentGrade == 12 && newGrade != null && newGrade == 12) {
                 studentDto.setReEnrollmentReason(reason);
+            }
+            // Set reason for Grade 11 re-enrolling to same grade and section
+            else if (currentGrade != null && currentGrade == 11 && newGrade != null && newGrade == 11) {
+                if (currentSectionId != null && newSectionId != null && currentSectionId.equals(newSectionId)) {
+                    studentDto.setReEnrollmentReason(reason);
+                }
             }
         }
         
@@ -823,7 +919,20 @@ public class AddStudentController {
                 Platform.runLater(() -> {
                     saveButton.setDisable(false);
                     saveButton.setText("Save Student");
-                    showError("Error " + (currentMode == Mode.RE_ENROLL ? "re-enrolling" : "saving") + " student: " + e.getMessage());
+                    
+                    // Check if error is related to section capacity
+                    String errorMessage = e.getMessage();
+                    if (errorMessage != null && errorMessage.contains("has reached its capacity")) {
+                        // Show alert dialog for capacity errors with better formatting
+                        Alert alert = new Alert(Alert.AlertType.WARNING);
+                        alert.setTitle("Section Capacity Reached");
+                        alert.setHeaderText("Cannot Add Student to Selected Section");
+                        alert.setContentText(errorMessage);
+                        alert.getDialogPane().setPrefWidth(600);
+                        alert.showAndWait();
+                    } else {
+                        showError("Error " + (currentMode == Mode.RE_ENROLL ? "re-enrolling" : "saving") + " student: " + errorMessage);
+                    }
                 });
             }
         }).start();
@@ -838,6 +947,10 @@ public class AddStudentController {
         if (choiceScreen != null) {
             choiceScreen.setVisible(false);
             choiceScreen.setManaged(false);
+        }
+        if (formScrollPane != null) {
+            formScrollPane.setVisible(true);
+            formScrollPane.setManaged(true);
         }
         if (formContainer != null) {
             formContainer.setVisible(true);
@@ -877,9 +990,13 @@ public class AddStudentController {
             studentSelectionScreen.setVisible(true);
             studentSelectionScreen.setManaged(true);
         }
+        if (formScrollPane != null) {
+            formScrollPane.setVisible(false);
+            formScrollPane.setManaged(false);
+        }
         if (formContainer != null) {
-            formContainer.setVisible(false);
-            formContainer.setManaged(false);
+            formContainer.setVisible(true);
+            formContainer.setManaged(true);
         }
         
         // Load eligible students
@@ -918,6 +1035,10 @@ public class AddStudentController {
         if (studentSelectionScreen != null) {
             studentSelectionScreen.setVisible(false);
             studentSelectionScreen.setManaged(false);
+        }
+        if (formScrollPane != null) {
+            formScrollPane.setVisible(true);
+            formScrollPane.setManaged(true);
         }
         if (formContainer != null) {
             formContainer.setVisible(true);
@@ -1037,18 +1158,45 @@ public class AddStudentController {
         if (parentGuardianRelationshipComboBox != null) parentGuardianRelationshipComboBox.setValue(student.getParentGuardianRelationship());
         
         // Set grade level - Grade 11 becomes 12, Grade 12 stays 12
+        // For archived students, allow them to stay in Grade 11 if needed
         Integer currentGrade = student.getGradeLevel();
+        Long currentSectionId = student.getSectionId();
         if (gradeLevelComboBox != null) {
             if (currentGrade != null && currentGrade == 11) {
-                gradeLevelComboBox.setValue(12); // Promote to Grade 12
+                // For archived students re-enrolling, default to Grade 12 but allow Grade 11
+                // The user can change it if needed
+                gradeLevelComboBox.setValue(12); // Default to Grade 12 (promotion)
             } else if (currentGrade != null && currentGrade == 12) {
                 gradeLevelComboBox.setValue(12); // Stay at Grade 12
-                // Show re-enrollment reason field for Grade 12
+                // Show re-enrollment reason field for Grade 12 (always required)
                 if (reEnrollmentReasonSection != null) {
                     reEnrollmentReasonSection.setVisible(true);
                     reEnrollmentReasonSection.setManaged(true);
                 }
             }
+        }
+        
+        // Check if re-enrollment reason field should be shown
+        // For Grade 12: always show (always required)
+        // For Grade 11: show only if re-enrolling to same grade and section
+        if (currentMode == Mode.RE_ENROLL) {
+            // Add listeners to dynamically show/hide reason field based on selections
+            if (gradeLevelComboBox != null) {
+                gradeLevelComboBox.valueProperty().addListener((observable, oldValue, newValue) -> {
+                    checkAndShowReEnrollmentReasonField(newValue, currentSectionId);
+                });
+            }
+            
+            if (sectionComboBox != null) {
+                sectionComboBox.valueProperty().addListener((observable, oldValue, newValue) -> {
+                    Integer currentGradeValue = gradeLevelComboBox != null ? gradeLevelComboBox.getValue() : null;
+                    Long newSectionId = newValue != null ? newValue.getId() : null;
+                    checkAndShowReEnrollmentReasonField(currentGradeValue, currentSectionId, newSectionId);
+                });
+            }
+            
+            // Initial check
+            checkAndShowReEnrollmentReasonField(gradeLevelComboBox != null ? gradeLevelComboBox.getValue() : null, currentSectionId);
         }
         
         if (strandComboBox != null) strandComboBox.setValue(student.getStrand());
@@ -1057,8 +1205,114 @@ public class AddStudentController {
         if (lrnField != null) lrnField.setText(student.getLrn());
         if (enrollmentStatusComboBox != null) enrollmentStatusComboBox.setValue("Enrolled");
         
+        // Set semester if available
+        if (semesterComboBox != null && student.getSemesterDisplayName() != null && !student.getSemesterDisplayName().isEmpty()) {
+            semesterComboBox.setValue(student.getSemesterDisplayName());
+        }
+        
         // Update sections based on grade and strand
         updateSections();
+    }
+    
+    /**
+     * Public method to set up the form for re-enrollment from an archived student.
+     * This bypasses the choice screen and directly shows the form with pre-filled data.
+     * 
+     * @param student The archived student to re-enroll
+     */
+    public void setupReEnrollmentFromArchived(StudentDto student) {
+        // Set mode to re-enrollment
+        currentMode = Mode.RE_ENROLL;
+        selectedStudentForReEnrollment = student;
+        
+        // Hide choice screen and student selection screen, show form
+        if (choiceScreen != null) {
+            choiceScreen.setVisible(false);
+            choiceScreen.setManaged(false);
+        }
+        if (studentSelectionScreen != null) {
+            studentSelectionScreen.setVisible(false);
+            studentSelectionScreen.setManaged(false);
+        }
+        if (formScrollPane != null) {
+            formScrollPane.setVisible(true);
+            formScrollPane.setManaged(true);
+        }
+        if (formContainer != null) {
+            formContainer.setVisible(true);
+            formContainer.setManaged(true);
+        }
+        
+        // Update form title and show mode indicator
+        if (formTitleLabel != null) {
+            formTitleLabel.setText("Re-Enroll Student");
+        }
+        if (modeIndicatorLabel != null) {
+            modeIndicatorLabel.setText("(Re-Enrollment Mode)");
+            modeIndicatorLabel.setVisible(true);
+        }
+        
+        // Ensure semesters are loaded before populating form
+        // If semesters haven't been loaded yet, wait for them
+        if (allSemesters == null || allSemesters.isEmpty()) {
+            // Load semesters first, then populate form
+            loadSemesters();
+            // Wait a bit for semesters to load, then populate
+            new Thread(() -> {
+                try {
+                    // Wait up to 2 seconds for semesters to load
+                    int attempts = 0;
+                    while ((allSemesters == null || allSemesters.isEmpty()) && attempts < 20) {
+                        Thread.sleep(100);
+                        attempts++;
+                    }
+                    Platform.runLater(() -> {
+                        populateFormFromStudent(student);
+                    });
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    Platform.runLater(() -> {
+                        populateFormFromStudent(student);
+                    });
+                }
+            }).start();
+        } else {
+            // Semesters already loaded, populate form immediately
+            Platform.runLater(() -> {
+                populateFormFromStudent(student);
+            });
+        }
+    }
+    
+    private void checkAndShowReEnrollmentReasonField(Integer gradeLevel, Long originalSectionId) {
+        Long currentSectionId = sectionComboBox != null && sectionComboBox.getValue() != null ? 
+            sectionComboBox.getValue().getId() : null;
+        checkAndShowReEnrollmentReasonField(gradeLevel, originalSectionId, currentSectionId);
+    }
+    
+    private void checkAndShowReEnrollmentReasonField(Integer gradeLevel, Long originalSectionId, Long currentSectionId) {
+        if (currentMode != Mode.RE_ENROLL || reEnrollmentReasonSection == null) {
+            return;
+        }
+        
+        // Show reason field if:
+        // 1. Grade 12 re-enrolling to Grade 12 (always required)
+        // 2. Grade 11 re-enrolling to Grade 11 AND same section
+        boolean shouldShow = false;
+        
+        if (gradeLevel != null && gradeLevel == 12) {
+            // Grade 12 always needs reason
+            shouldShow = true;
+        } else if (gradeLevel != null && gradeLevel == 11) {
+            // Grade 11 needs reason only if re-enrolling to same section
+            if (originalSectionId != null && currentSectionId != null && 
+                originalSectionId.equals(currentSectionId)) {
+                shouldShow = true;
+            }
+        }
+        
+        reEnrollmentReasonSection.setVisible(shouldShow);
+        reEnrollmentReasonSection.setManaged(shouldShow);
     }
     
     private void clearAllFields() {
@@ -1078,7 +1332,111 @@ public class AddStudentController {
         if (gwaField != null) gwaField.clear();
         if (lrnField != null) lrnField.clear();
         if (enrollmentStatusComboBox != null) enrollmentStatusComboBox.setValue("Pending");
+        if (semesterComboBox != null) semesterComboBox.setValue(null);
         if (reEnrollmentReasonField != null) reEnrollmentReasonField.clear();
+    }
+    
+    private void loadSemesters() {
+        if (semesterService == null || semesterComboBox == null) {
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                // Load ALL semesters from ALL school years (for Add Student page)
+                allSemesters = semesterService.getAllSemestersForDropdown();
+                
+                System.out.println("AddStudentController: Loaded " + allSemesters.size() + " semesters for dropdown");
+                
+                Platform.runLater(() -> {
+                    // Filter semesters based on selected grade level (if any)
+                    updateSemestersByGradeLevel(gradeLevelComboBox.getValue());
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    System.err.println("Error loading semesters: " + e.getMessage());
+                });
+            }
+        }).start();
+    }
+    
+    private void updateSemestersByGradeLevel(Integer gradeLevel) {
+        if (semesterComboBox == null || allSemesters == null || allSemesters.isEmpty()) {
+            return;
+        }
+        
+        try {
+            String currentSelection = semesterComboBox.getValue();
+            semesterMap.clear();
+            semesterToSchoolYearMap.clear();
+            semesterComboBox.getItems().clear();
+            
+            // Filter semesters by grade level if grade level is selected
+            List<SemesterDto> filteredSemesters = allSemesters;
+            if (gradeLevel != null) {
+                filteredSemesters = allSemesters.stream()
+                    .filter(s -> s.getGradeLevel() != null && s.getGradeLevel().equals(gradeLevel))
+                    .collect(java.util.stream.Collectors.toList());
+            }
+            
+            // Use a Set to track unique display names to avoid duplicates
+            java.util.Set<String> seenDisplayNames = new java.util.HashSet<>();
+            
+            for (SemesterDto semester : filteredSemesters) {
+                String displayName = semester.getDisplayName();
+                if (displayName != null && !displayName.isEmpty()) {
+                    // Only add if we haven't seen this display name before
+                    // This handles the case where multiple semesters have the same display name
+                    // (e.g., same school year + semester number but different grade levels)
+                    if (!seenDisplayNames.contains(displayName)) {
+                        semesterComboBox.getItems().add(displayName);
+                        seenDisplayNames.add(displayName);
+                        // Store the first semester ID for this display name
+                        // When saving, we'll match it to the correct semester based on grade level
+                        semesterMap.put(displayName, semester.getId());
+                        if (semester.getSchoolYearId() != null) {
+                            semesterToSchoolYearMap.put(semester.getId(), semester.getSchoolYearId());
+                        }
+                        System.out.println("AddStudentController: Added semester: " + displayName + " (Grade " + semester.getGradeLevel() + ")");
+                    }
+                }
+            }
+            
+            // Clear selection if current selection is no longer valid
+            if (currentSelection != null && !semesterComboBox.getItems().contains(currentSelection)) {
+                semesterComboBox.setValue(null);
+            }
+            
+            // Set cell factory for proper display
+            semesterComboBox.setCellFactory(listView -> new javafx.scene.control.ListCell<String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(item);
+                    }
+                }
+            });
+            
+            // Set button cell factory
+            semesterComboBox.setButtonCell(new javafx.scene.control.ListCell<String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(item);
+                    }
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.err.println("Error populating semester dropdown: " + e.getMessage());
+        }
     }
     
     private void setupSearchAndFilters() {
@@ -1354,6 +1712,7 @@ public class AddStudentController {
         gwaField.setStyle("");
         lrnField.setStyle("");
         enrollmentStatusComboBox.setStyle("");
+        if (semesterComboBox != null) semesterComboBox.setStyle("");
     }
 }
 

@@ -20,6 +20,12 @@ public class SchoolYearService {
     @Autowired(required = false)
     private StudentRepository studentRepository;
     
+    @Autowired(required = false)
+    private com.enrollment.system.service.SemesterService semesterService;
+    
+    @Autowired(required = false)
+    private com.enrollment.system.repository.SemesterRepository semesterRepository;
+    
     @Transactional(readOnly = true)
     public SchoolYearDto getCurrentSchoolYear() {
         SchoolYear current = schoolYearRepository.findByIsCurrentTrue()
@@ -61,6 +67,18 @@ public class SchoolYearService {
         schoolYear.setIsCurrent(false); // New school years are not current by default
         
         SchoolYear saved = schoolYearRepository.save(schoolYear);
+        
+        // Auto-create semesters for the new school year
+        if (semesterService != null) {
+            try {
+                semesterService.createSemestersForSchoolYear(saved.getId());
+            } catch (Exception e) {
+                // Log error but don't fail school year creation
+                System.err.println("Warning: Could not create semesters for school year: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+        
         return SchoolYearDto.fromSchoolYear(saved);
     }
     
@@ -182,6 +200,19 @@ public class SchoolYearService {
             if (studentCount >= 2) {
                 throw new RuntimeException("Cannot delete school year " + schoolYear.getYear() + 
                         ". It has " + studentCount + " student(s). School years can only be deleted if they have less than 2 students.");
+            }
+        }
+        
+        // Delete all semesters associated with this school year
+        if (semesterRepository != null) {
+            try {
+                List<com.enrollment.system.model.Semester> semesters = semesterRepository.findBySchoolYearId(schoolYearId);
+                for (com.enrollment.system.model.Semester semester : semesters) {
+                    semesterRepository.delete(semester);
+                }
+            } catch (Exception e) {
+                // Log but don't fail deletion if semester repository is not available
+                System.err.println("Warning: Could not delete semesters: " + e.getMessage());
             }
         }
         

@@ -15,6 +15,7 @@ import javafx.scene.layout.HBox;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import java.net.URL;
 import java.time.LocalDateTime;
@@ -71,6 +72,9 @@ public class ArchiveStudentsController implements Initializable {
     
     @Autowired
     private StudentService studentService;
+    
+    @Autowired
+    private ApplicationContext applicationContext;
     
     private ObservableList<StudentDto> studentList;
     private FilteredList<StudentDto> filteredList;
@@ -137,17 +141,17 @@ public class ArchiveStudentsController implements Initializable {
             return new SimpleStringProperty("");
         });
         
-        // Actions column - restore button
+        // Actions column - re-enroll button
         actionsColumn.setCellFactory(column -> new TableCell<StudentDto, String>() {
-            private final Button restoreButton = new Button("Restore");
-            private final HBox hbox = new HBox(5, restoreButton);
+            private final Button reEnrollButton = new Button("Re-enroll");
+            private final HBox hbox = new HBox(5, reEnrollButton);
             
             {
-                restoreButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
+                reEnrollButton.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
                 
-                restoreButton.setOnAction(e -> {
+                reEnrollButton.setOnAction(e -> {
                     StudentDto student = getTableView().getItems().get(getIndex());
-                    handleRestore(student);
+                    handleReEnroll(student);
                 });
             }
             
@@ -270,43 +274,41 @@ public class ArchiveStudentsController implements Initializable {
         }
     }
     
-    private void handleRestore(StudentDto student) {
-        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
-        confirmAlert.setTitle("Restore Student");
-        confirmAlert.setHeaderText("Restore Student");
-        confirmAlert.setContentText("Are you sure you want to restore " + student.getName() + "?\n\nThis will move the student back to the active students list.");
-        
-        confirmAlert.showAndWait().ifPresent(response -> {
-            if (response == ButtonType.OK) {
-                // Restore student in background thread to avoid blocking UI
-                new Thread(() -> {
-                    try {
-                        // Restore student (this is a blocking database operation)
-                        studentService.restoreStudent(student.getId());
-                        
-                        // Update UI on JavaFX thread
-                        Platform.runLater(() -> {
-                            // Show success message
-                            Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
-                            successAlert.setTitle("Success");
-                            successAlert.setHeaderText("Student Restored");
-                            successAlert.setContentText("Student " + student.getName() + " has been restored successfully.");
-                            successAlert.showAndWait();
-                            
-                            // Refresh the table
-                            refreshData();
-                        });
-                        
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        // Update UI on JavaFX thread to show error
-                        Platform.runLater(() -> {
-                            showError("Error restoring student: " + e.getMessage());
-                        });
-                    }
-                }).start();
+    private void handleReEnroll(StudentDto student) {
+        try {
+            // Load Add Student FXML
+            javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/FXML/AddStudent.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            javafx.scene.Parent addStudentRoot = loader.load();
+            
+            // Get the controller
+            AddStudentController addStudentController = loader.getController();
+            
+            // Set up the controller for re-enrollment from archived student
+            if (addStudentController != null) {
+                addStudentController.setupReEnrollmentFromArchived(student);
             }
-        });
+            
+            // Create new stage for Add Student form
+            javafx.stage.Stage addStudentStage = new javafx.stage.Stage();
+            addStudentStage.setTitle("Re-Enroll Student - Seguinon SHS Enrollment System");
+            addStudentStage.setScene(new javafx.scene.Scene(addStudentRoot));
+            addStudentStage.setResizable(true);
+            addStudentStage.setWidth(1200);
+            addStudentStage.setHeight(750);
+            addStudentStage.setResizable(false);
+            
+            // Set owner to archive students stage
+            javafx.stage.Stage archiveStage = (javafx.stage.Stage) studentsTable.getScene().getWindow();
+            addStudentStage.initOwner(archiveStage);
+            
+            // Show Add Student form
+            addStudentStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            showError("Error opening re-enrollment form: " + e.getMessage());
+        }
     }
     
     private void showError(String message) {

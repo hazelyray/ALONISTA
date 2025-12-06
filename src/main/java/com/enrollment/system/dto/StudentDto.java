@@ -26,6 +26,9 @@ public class StudentDto {
     private String enrollmentStatus;
     private Long schoolYearId;
     private String schoolYear;
+    private Long semesterId;
+    private String semesterName;
+    private String semesterDisplayName;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Boolean isArchived;
@@ -76,6 +79,44 @@ public class StudentDto {
             // Handle lazy loading exception - school year not loaded
             dto.setSchoolYearId(null);
             dto.setSchoolYear(null);
+        }
+        try {
+            if (student.getSemester() != null) {
+                dto.setSemesterId(student.getSemester().getId());
+                dto.setSemesterName(student.getSemester().getName());
+                // Generate clean display name: "School Year - Semester X" (without grade)
+                String displayName = null;
+                if (student.getSchoolYear() != null) {
+                    try {
+                        String schoolYearStr = student.getSchoolYear().getYear();
+                        Integer semesterNum = student.getSemester().getSemesterNumber();
+                        if (semesterNum != null) {
+                            displayName = schoolYearStr + " - Semester " + semesterNum;
+                        } else {
+                            // Fallback: remove grade from semester name
+                            String semesterName = student.getSemester().getName();
+                            String cleanSemesterName = semesterName.replaceFirst("^Grade \\d+ - ", "");
+                            displayName = schoolYearStr + " - " + cleanSemesterName;
+                        }
+                    } catch (Exception e) {
+                        // If school year lazy load fails, just use clean semester name
+                        String semesterName = student.getSemester().getName();
+                        displayName = semesterName != null ? 
+                            semesterName.replaceFirst("^Grade \\d+ - ", "") : "N/A";
+                    }
+                } else {
+                    // No school year, just clean semester name
+                    String semesterName = student.getSemester().getName();
+                    displayName = semesterName != null ? 
+                        semesterName.replaceFirst("^Grade \\d+ - ", "") : "N/A";
+                }
+                dto.setSemesterDisplayName(displayName);
+            }
+        } catch (Exception e) {
+            // Handle lazy loading exception - semester not loaded
+            dto.setSemesterId(null);
+            dto.setSemesterName(null);
+            dto.setSemesterDisplayName(null);
         }
         dto.setCreatedAt(student.getCreatedAt());
         dto.setUpdatedAt(student.getUpdatedAt());
@@ -245,6 +286,30 @@ public class StudentDto {
     
     public void setSchoolYear(String schoolYear) {
         this.schoolYear = schoolYear;
+    }
+    
+    public Long getSemesterId() {
+        return semesterId;
+    }
+    
+    public void setSemesterId(Long semesterId) {
+        this.semesterId = semesterId;
+    }
+    
+    public String getSemesterName() {
+        return semesterName;
+    }
+    
+    public void setSemesterName(String semesterName) {
+        this.semesterName = semesterName;
+    }
+    
+    public String getSemesterDisplayName() {
+        return semesterDisplayName;
+    }
+    
+    public void setSemesterDisplayName(String semesterDisplayName) {
+        this.semesterDisplayName = semesterDisplayName;
     }
     
     public LocalDateTime getCreatedAt() {

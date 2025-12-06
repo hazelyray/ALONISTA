@@ -165,5 +165,137 @@ public class SectionService {
         // Permanent delete - actually remove from database
         sectionRepository.delete(section);
     }
+    
+    /**
+     * Get the current number of enrolled students in a section
+     */
+    @Transactional(readOnly = true)
+    public long getCurrentStudentCount(Long sectionId) {
+        return studentRepository.countBySectionIdAndEnrolled(sectionId);
+    }
+    
+    /**
+     * Get the current number of enrolled students in a section for a specific semester
+     */
+    @Transactional(readOnly = true)
+    public long getCurrentStudentCount(Long sectionId, Long semesterId) {
+        if (semesterId == null) {
+            return getCurrentStudentCount(sectionId);
+        }
+        return studentRepository.countBySectionIdAndSemesterIdAndEnrolled(sectionId, semesterId);
+    }
+    
+    /**
+     * Get the current number of enrolled students in a section for a specific semester,
+     * verifying that students match the section's grade level and strand
+     */
+    @Transactional(readOnly = true)
+    public long getCurrentStudentCount(Long sectionId, Long semesterId, Integer gradeLevel, String strand) {
+        if (semesterId == null || gradeLevel == null || strand == null) {
+            // Fall back to basic count if parameters are missing
+            return getCurrentStudentCount(sectionId, semesterId);
+        }
+        return studentRepository.countBySectionIdAndSemesterIdAndGradeLevelAndStrandAndEnrolled(sectionId, semesterId, gradeLevel, strand);
+    }
+    
+    /**
+     * Check if a section has available capacity
+     */
+    @Transactional(readOnly = true)
+    public boolean hasAvailableCapacity(Long sectionId) {
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Section not found with id: " + sectionId));
+        
+        // Capacity must be set - if null, throw error (sections must have capacity defined)
+        if (section.getCapacity() == null) {
+            throw new IllegalStateException("Section " + section.getName() + " does not have a capacity set. Please set a capacity for this section before enrolling students.");
+        }
+        
+        long currentCount = getCurrentStudentCount(sectionId);
+        return currentCount < section.getCapacity();
+    }
+    
+    /**
+     * Check if a section has available capacity for a specific semester
+     */
+    @Transactional(readOnly = true)
+    public boolean hasAvailableCapacity(Long sectionId, Long semesterId) {
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Section not found with id: " + sectionId));
+        
+        // Capacity must be set - if null, throw error (sections must have capacity defined)
+        if (section.getCapacity() == null) {
+            throw new IllegalStateException("Section " + section.getName() + " does not have a capacity set. Please set a capacity for this section before enrolling students.");
+        }
+        
+        // Use enhanced count that verifies grade level and strand match the section
+        long currentCount = getCurrentStudentCount(sectionId, semesterId, section.getGradeLevel(), section.getStrand());
+        // Check if current count is less than capacity (strictly less, not equal)
+        // If currentCount is 40 and capacity is 40, then 40 < 40 is false, so no capacity available
+        // If currentCount is 39 and capacity is 40, then 39 < 40 is true, so capacity available
+        boolean hasCapacity = currentCount < section.getCapacity();
+        
+        return hasCapacity;
+    }
+    
+    /**
+     * Get available capacity (remaining slots) for a section
+     */
+    @Transactional(readOnly = true)
+    public int getAvailableCapacity(Long sectionId) {
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Section not found with id: " + sectionId));
+        
+        // If capacity is null, assume unlimited capacity
+        if (section.getCapacity() == null) {
+            return Integer.MAX_VALUE;
+        }
+        
+        long currentCount = getCurrentStudentCount(sectionId);
+        int available = section.getCapacity() - (int) currentCount;
+        return Math.max(0, available);
+    }
+    
+    /**
+     * Get available capacity (remaining slots) for a section in a specific semester
+     */
+    @Transactional(readOnly = true)
+    public int getAvailableCapacity(Long sectionId, Long semesterId) {
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Section not found with id: " + sectionId));
+        
+        // If capacity is null, assume unlimited capacity
+        if (section.getCapacity() == null) {
+            return Integer.MAX_VALUE;
+        }
+        
+        long currentCount = getCurrentStudentCount(sectionId, semesterId);
+        int available = section.getCapacity() - (int) currentCount;
+        return Math.max(0, available);
+    }
+    
+    /**
+     * Get alternative sections with available capacity for the same strand and grade level
+     */
+    @Transactional(readOnly = true)
+    public List<Section> getAlternativeSections(String strand, Integer gradeLevel, Long excludeSectionId) {
+        List<Section> allSections = getActiveSectionsByStrandAndGradeLevel(strand, gradeLevel);
+        return allSections.stream()
+                .filter(section -> !section.getId().equals(excludeSectionId))
+                .filter(section -> hasAvailableCapacity(section.getId()))
+                .collect(java.util.stream.Collectors.toList());
+    }
+    
+    /**
+     * Get alternative sections with available capacity for the same strand and grade level in a specific semester
+     */
+    @Transactional(readOnly = true)
+    public List<Section> getAlternativeSections(String strand, Integer gradeLevel, Long excludeSectionId, Long semesterId) {
+        List<Section> allSections = getActiveSectionsByStrandAndGradeLevel(strand, gradeLevel);
+        return allSections.stream()
+                .filter(section -> !section.getId().equals(excludeSectionId))
+                .filter(section -> hasAvailableCapacity(section.getId(), semesterId))
+                .collect(java.util.stream.Collectors.toList());
+    }
 }
 
