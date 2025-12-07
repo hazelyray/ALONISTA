@@ -41,6 +41,9 @@ public class User {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
     
+    @Column(name = "profile_picture", length = 500)
+    private String profilePicture; // Path to profile picture file
+    
     // Teacher assignments (only for TEACHER role)
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -172,6 +175,14 @@ public class User {
     
     public void setSections(Set<Section> sections) {
         this.sections = sections;
+    }
+    
+    public String getProfilePicture() {
+        return profilePicture;
+    }
+    
+    public void setProfilePicture(String profilePicture) {
+        this.profilePicture = profilePicture;
     }
     
     // JPA Lifecycle callbacks

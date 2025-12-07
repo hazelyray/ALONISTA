@@ -25,17 +25,36 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.FlowPane;
 import javafx.stage.Stage;
+import javafx.stage.FileChooser;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import javafx.scene.layout.StackPane;
+import javafx.scene.shape.Circle;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.util.Duration;
 
 @Component
 public class TeacherDashboardController {
@@ -45,6 +64,18 @@ public class TeacherDashboardController {
     
     @FXML
     private Label userRoleLabel;
+    
+    @FXML
+    private Label dateTimeLabel;
+    
+    @FXML
+    private StackPane profilePictureContainer;
+    
+    @FXML
+    private ImageView profileImageView;
+    
+    @FXML
+    private Label profileInitialsLabel;
     
     @FXML
     private Button logoutButton;
@@ -57,9 +88,6 @@ public class TeacherDashboardController {
     
     @FXML
     private Button btnMyStudents;
-    
-    @FXML
-    private Button btnReports;
     
     @FXML
     private Button btnAccountSettings;
@@ -126,15 +154,6 @@ public class TeacherDashboardController {
             btnMyStudents.setOnMouseExited(e -> btnMyStudents.setStyle(originalStyle[0]));
         }
         
-        if (btnReports != null) {
-            final String[] originalStyle = {defaultStyle};
-            btnReports.setOnMouseEntered(e -> {
-                originalStyle[0] = btnReports.getStyle();
-                btnReports.setStyle(hoverStyle);
-            });
-            btnReports.setOnMouseExited(e -> btnReports.setStyle(originalStyle[0]));
-        }
-        
         if (btnAccountSettings != null) {
             final String[] originalStyle = {defaultStyle};
             btnAccountSettings.setOnMouseEntered(e -> {
@@ -145,16 +164,27 @@ public class TeacherDashboardController {
         }
     }
     
+    private Timeline dateTimeTimeline;
+    
     public void setUserSession(UserDto user, String token) {
         this.currentUser = user;
         this.sessionToken = token;
         
-        if (userNameLabel != null && user != null) {
-            userNameLabel.setText("Welcome, " + user.getFullName());
-        }
-        if (userRoleLabel != null && user != null) {
-            userRoleLabel.setText("(" + user.getRoleDisplayName() + ")");
-        }
+        // Update user info in header (without "Welcome")
+        Platform.runLater(() -> {
+            if (userNameLabel != null && user != null) {
+                userNameLabel.setText(user.getFullName());
+            }
+            if (userRoleLabel != null && user != null) {
+                userRoleLabel.setText(user.getRoleDisplayName());
+            }
+            
+            // Load and display profile picture or initials
+            loadProfilePicture();
+            
+            // Start date/time update
+            startDateTimeUpdate();
+        });
         
         // Set up close handler
         Platform.runLater(() -> {
@@ -162,6 +192,10 @@ public class TeacherDashboardController {
                 Stage dashboardStage = (Stage) (userNameLabel != null && userNameLabel.getScene() != null ? userNameLabel.getScene().getWindow() : null);
                 if (dashboardStage != null) {
                     dashboardStage.setOnCloseRequest(event -> {
+                        // Stop date/time timeline
+                        if (dateTimeTimeline != null) {
+                            dateTimeTimeline.stop();
+                        }
                         if (loginStage != null) {
                             loginStage.show();
                         } else {
@@ -182,6 +216,137 @@ public class TeacherDashboardController {
                 e.printStackTrace();
             }
         });
+    }
+    
+    private void loadProfilePicture() {
+        if (profilePictureContainer == null || profileImageView == null || profileInitialsLabel == null || currentUser == null) {
+            return;
+        }
+        
+        try {
+            // Ensure ImageView is properly sized
+            profileImageView.setFitWidth(40);
+            profileImageView.setFitHeight(40);
+            profileImageView.setPreserveRatio(true);
+            profileImageView.setSmooth(true);
+            profileImageView.setCache(true);
+            
+            // Update clip when layout bounds change to ensure proper centering
+            profileImageView.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+                if (newBounds.getWidth() > 0 && newBounds.getHeight() > 0) {
+                    double radius = Math.min(newBounds.getWidth(), newBounds.getHeight()) / 2.0;
+                    Circle clip = new Circle(
+                        newBounds.getWidth() / 2.0,
+                        newBounds.getHeight() / 2.0,
+                        radius
+                    );
+                    profileImageView.setClip(clip);
+                }
+            });
+            
+            // Set initial clip
+            Circle initialClip = new Circle(20, 20, 20);
+            profileImageView.setClip(initialClip);
+            
+            // Try to load profile picture
+            boolean pictureLoaded = false;
+            if (currentUser.getProfilePicture() != null && !currentUser.getProfilePicture().isEmpty()) {
+                try {
+                    File imageFile = new File(currentUser.getProfilePicture());
+                    if (imageFile.exists()) {
+                        Image image = new Image(imageFile.toURI().toString(), 40, 40, true, true, true);
+                        profileImageView.setImage(image);
+                        profileImageView.setVisible(true);
+                        profileInitialsLabel.setVisible(false);
+                        pictureLoaded = true;
+                    }
+                } catch (Exception e) {
+                    // If image fails to load, show initials
+                }
+            }
+            
+            // If no picture loaded, show initials
+            if (!pictureLoaded) {
+                String initials = getInitials(currentUser.getFullName());
+                profileInitialsLabel.setText(initials);
+                profileImageView.setVisible(false);
+                profileInitialsLabel.setVisible(true);
+                
+                // Set background color based on name hash for consistency
+                String color = getColorForName(currentUser.getFullName());
+                profilePictureContainer.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 20; -fx-pref-width: 40; -fx-pref-height: 40;");
+            } else {
+                // If picture is loaded, ensure container has proper styling with circular background
+                profilePictureContainer.setStyle("-fx-background-color: transparent; -fx-background-radius: 20; -fx-pref-width: 40; -fx-pref-height: 40;");
+            }
+        } catch (Exception e) {
+            // Fallback to initials on any error
+            if (currentUser != null) {
+                String initials = getInitials(currentUser.getFullName());
+                profileInitialsLabel.setText(initials);
+                profileImageView.setVisible(false);
+                profileInitialsLabel.setVisible(true);
+                String color = getColorForName(currentUser.getFullName());
+                profilePictureContainer.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 20; -fx-pref-width: 40; -fx-pref-height: 40;");
+            }
+        }
+    }
+    
+    private String getInitials(String fullName) {
+        if (fullName == null || fullName.trim().isEmpty()) {
+            return "U";
+        }
+        
+        String[] parts = fullName.trim().split("\\s+");
+        if (parts.length >= 2) {
+            // First letter of first name and first letter of last name
+            return (parts[0].charAt(0) + "" + parts[parts.length - 1].charAt(0)).toUpperCase();
+        } else if (parts.length == 1) {
+            // First two letters of the name
+            String name = parts[0];
+            if (name.length() >= 2) {
+                return name.substring(0, 2).toUpperCase();
+            } else {
+                return name.substring(0, 1).toUpperCase();
+            }
+        }
+        return "U";
+    }
+    
+    private String getColorForName(String name) {
+        // Generate a consistent color based on name hash
+        int hash = name != null ? name.hashCode() : 0;
+        String[] colors = {
+            "#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6",
+            "#1abc9c", "#e67e22", "#34495e", "#16a085", "#c0392b"
+        };
+        int index = Math.abs(hash) % colors.length;
+        return colors[index];
+    }
+    
+    private void startDateTimeUpdate() {
+        if (dateTimeLabel == null) {
+            return;
+        }
+        
+        // Update immediately
+        updateDateTime();
+        
+        // Update every minute
+        dateTimeTimeline = new Timeline(new KeyFrame(Duration.minutes(1), e -> updateDateTime()));
+        dateTimeTimeline.setCycleCount(Animation.INDEFINITE);
+        dateTimeTimeline.play();
+    }
+    
+    private void updateDateTime() {
+        if (dateTimeLabel == null) {
+            return;
+        }
+        
+        LocalDateTime now = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MMM d, yyyy, h:mm a");
+        String formattedDateTime = now.format(formatter);
+        dateTimeLabel.setText(formattedDateTime);
     }
     
     public void setLoginStage(Stage loginStage) {
@@ -216,15 +381,6 @@ public class TeacherDashboardController {
     }
     
     @FXML
-    private void showReports() {
-        resetButtonStyles();
-        if (btnReports != null) {
-            btnReports.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.4), 8, 0, 0, 0);");
-        }
-        loadReportsPage();
-    }
-    
-    @FXML
     private void showAccountSettings() {
         resetButtonStyles();
         if (btnAccountSettings != null) {
@@ -238,7 +394,6 @@ public class TeacherDashboardController {
         if (btnDashboard != null) btnDashboard.setStyle(defaultStyle);
         if (btnMySubjects != null) btnMySubjects.setStyle(defaultStyle);
         if (btnMyStudents != null) btnMyStudents.setStyle(defaultStyle);
-        if (btnReports != null) btnReports.setStyle(defaultStyle);
         if (btnAccountSettings != null) btnAccountSettings.setStyle(defaultStyle);
     }
     
@@ -350,22 +505,22 @@ public class TeacherDashboardController {
                                       List<StudentDto> students) {
         dashboardContent.getChildren().clear();
         
-        // Welcome Header
-        HBox welcomeHeader = new HBox(15);
-        welcomeHeader.setAlignment(Pos.CENTER_LEFT);
-        welcomeHeader.setPadding(new Insets(0, 0, 30, 0));
+        // Dashboard Title and School Year
+        HBox header = new HBox(15);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(0, 0, 30, 0));
         
-        Label welcomeLabel = new Label("Welcome, " + teacherName);
-        welcomeLabel.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Label dashboardTitle = new Label("Dashboard");
+        dashboardTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         
         Label schoolYearLabel = new Label("School Year: " + schoolYear);
-        schoolYearLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #7f8c8d; -fx-padding: 8 0 0 0;");
+        schoolYearLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #7f8c8d; -fx-padding: 8 0 0 0;");
         
         VBox headerBox = new VBox(5);
-        headerBox.getChildren().addAll(welcomeLabel, schoolYearLabel);
-        welcomeHeader.getChildren().add(headerBox);
+        headerBox.getChildren().addAll(dashboardTitle, schoolYearLabel);
+        header.getChildren().add(headerBox);
         
-        dashboardContent.getChildren().add(welcomeHeader);
+        dashboardContent.getChildren().add(header);
         
         // Summary Panel
         HBox summaryPanel = new HBox(20);
@@ -1034,35 +1189,8 @@ public class TeacherDashboardController {
         }
     }
     
-    private void loadReportsPage() {
-        if (dashboardContent == null) {
-            return;
-        }
-        
-        dashboardContent.getChildren().clear();
-        
-        // Page Title
-        Label pageTitle = new Label("Reports");
-        pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 30 0;");
-        dashboardContent.getChildren().add(pageTitle);
-        
-        // Empty state
-        VBox emptyBox = new VBox(15);
-        emptyBox.setAlignment(Pos.CENTER);
-        emptyBox.setPadding(new Insets(60, 20, 60, 20));
-        
-        Label emptyIcon = new Label("📊");
-        emptyIcon.setStyle("-fx-font-size: 64px;");
-        
-        Label emptyLabel = new Label("Reports feature coming soon.");
-        emptyLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #95a5a6;");
-        
-        emptyBox.getChildren().addAll(emptyIcon, emptyLabel);
-        dashboardContent.getChildren().add(emptyBox);
-    }
-    
     private void loadAccountSettingsPage() {
-        if (dashboardContent == null) {
+        if (dashboardContent == null || currentUser == null) {
             return;
         }
         
@@ -1073,20 +1201,304 @@ public class TeacherDashboardController {
         pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 30 0;");
         dashboardContent.getChildren().add(pageTitle);
         
-        // Empty state
-        VBox emptyBox = new VBox(15);
-        emptyBox.setAlignment(Pos.CENTER);
-        emptyBox.setPadding(new Insets(60, 20, 60, 20));
+        // Main container
+        VBox mainContainer = new VBox(25);
+        mainContainer.setPadding(new Insets(20));
+        mainContainer.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 8, 0, 0, 2);");
         
-        Label emptyIcon = new Label("⚙️");
-        emptyIcon.setStyle("-fx-font-size: 64px;");
+        // Profile Picture Section
+        VBox profilePictureSection = new VBox(15);
+        profilePictureSection.setAlignment(Pos.CENTER);
+        profilePictureSection.setPadding(new Insets(20));
         
-        Label emptyLabel = new Label("Account settings feature coming soon.\nYou will be able to update your name, password, and profile picture.");
-        emptyLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #95a5a6; -fx-text-alignment: center;");
-        emptyLabel.setWrapText(true);
+        Label profilePictureLabel = new Label("Profile Picture");
+        profilePictureLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         
-        emptyBox.getChildren().addAll(emptyIcon, emptyLabel);
-        dashboardContent.getChildren().add(emptyBox);
+        // Profile picture display - circular container
+        accountSettingsProfileContainer = new StackPane();
+        accountSettingsProfileContainer.setPrefWidth(150);
+        accountSettingsProfileContainer.setPrefHeight(150);
+        accountSettingsProfileContainer.setStyle("-fx-background-color: #ecf0f1; -fx-background-radius: 75;");
+        
+        // Profile picture ImageView - circular
+        accountSettingsProfileImageView = new ImageView();
+        accountSettingsProfileImageView.setFitWidth(150);
+        accountSettingsProfileImageView.setFitHeight(150);
+        accountSettingsProfileImageView.setPreserveRatio(true);
+        accountSettingsProfileImageView.setSmooth(true);
+        accountSettingsProfileImageView.setCache(true);
+        
+        // Update clip when layout bounds change to ensure proper centering
+        accountSettingsProfileImageView.layoutBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
+            if (newBounds.getWidth() > 0 && newBounds.getHeight() > 0) {
+                double radius = Math.min(newBounds.getWidth(), newBounds.getHeight()) / 2.0;
+                Circle clip = new Circle(
+                    newBounds.getWidth() / 2.0,
+                    newBounds.getHeight() / 2.0,
+                    radius
+                );
+                accountSettingsProfileImageView.setClip(clip);
+            }
+        });
+        
+        // Set initial clip
+        Circle initialClip = new Circle(75, 75, 75);
+        accountSettingsProfileImageView.setClip(initialClip);
+        
+        // Initials label (shown when no picture)
+        accountSettingsInitialsLabel = new Label(getInitials(currentUser.getFullName()));
+        accountSettingsInitialsLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 48px; -fx-font-weight: bold;");
+        
+        // Load existing profile picture if available
+        boolean hasPicture = false;
+        if (currentUser.getProfilePicture() != null && !currentUser.getProfilePicture().isEmpty()) {
+            try {
+                File imageFile = new File(currentUser.getProfilePicture());
+                if (imageFile.exists()) {
+                    Image image = new Image(imageFile.toURI().toString(), 150, 150, true, true, true);
+                    accountSettingsProfileImageView.setImage(image);
+                    accountSettingsProfileImageView.setVisible(true);
+                    accountSettingsInitialsLabel.setVisible(false);
+                    hasPicture = true;
+                }
+            } catch (Exception e) {
+                // If image fails to load, show initials
+            }
+        }
+        
+        if (!hasPicture) {
+            accountSettingsProfileImageView.setVisible(false);
+            accountSettingsInitialsLabel.setVisible(true);
+            String color = getColorForName(currentUser.getFullName());
+            accountSettingsProfileContainer.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 75;");
+            accountSettingsInitialsLabel.setStyle("-fx-text-fill: white; -fx-font-size: 48px; -fx-font-weight: bold;");
+        }
+        
+        accountSettingsProfileContainer.getChildren().addAll(accountSettingsProfileImageView, accountSettingsInitialsLabel);
+        
+        // Upload button
+        Button uploadButton = new Button("📷 Upload Picture");
+        uploadButton.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20; -fx-background-radius: 8; -fx-cursor: hand;");
+        uploadButton.setOnAction(e -> handleProfilePictureUpload(accountSettingsProfileImageView));
+        
+        // File size info
+        Label fileSizeLabel = new Label("Maximum file size: 3 MB");
+        fileSizeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #7f8c8d;");
+        
+        profilePictureSection.getChildren().addAll(profilePictureLabel, accountSettingsProfileContainer, uploadButton, fileSizeLabel);
+        
+        // Form Section
+        VBox formSection = new VBox(20);
+        formSection.setPadding(new Insets(20));
+        
+        // Name Field
+        VBox nameFieldBox = new VBox(8);
+        Label nameLabel = new Label("Full Name *");
+        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        TextField nameField = new TextField(currentUser.getFullName());
+        nameField.setStyle("-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 8; -fx-border-color: #bdc3c7; -fx-border-radius: 8;");
+        nameField.setPrefWidth(400);
+        nameFieldBox.getChildren().addAll(nameLabel, nameField);
+        
+        // Password Field (Disabled)
+        VBox passwordFieldBox = new VBox(8);
+        Label passwordLabel = new Label("Password");
+        passwordLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        PasswordField passwordField = new PasswordField();
+        passwordField.setText("••••••••");
+        passwordField.setDisable(true);
+        passwordField.setStyle("-fx-font-size: 14px; -fx-padding: 10; -fx-background-color: #ecf0f1; -fx-background-radius: 8; -fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-opacity: 0.7;");
+        passwordField.setPrefWidth(400);
+        
+        // Show alert when trying to edit password
+        passwordField.setOnMouseClicked(e -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Password Change Not Allowed");
+            alert.setHeaderText("You do not have permission to edit password");
+            alert.setContentText("Please contact the administrator if you need a new password.");
+            alert.showAndWait();
+        });
+        
+        Label passwordInfoLabel = new Label("Contact administrator to change password");
+        passwordInfoLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #7f8c8d; -fx-font-style: italic;");
+        passwordFieldBox.getChildren().addAll(passwordLabel, passwordField, passwordInfoLabel);
+        
+        // Save Button
+        Button saveButton = new Button("💾 Save Changes");
+        saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 8; -fx-cursor: hand;");
+        saveButton.setOnAction(e -> handleSaveProfile(nameField.getText().trim(), accountSettingsProfileImageView, saveButton));
+        
+        formSection.getChildren().addAll(nameFieldBox, passwordFieldBox, saveButton);
+        
+        mainContainer.getChildren().addAll(profilePictureSection, formSection);
+        dashboardContent.getChildren().add(mainContainer);
+    }
+    
+    private File selectedProfilePictureFile = null;
+    private ImageView accountSettingsProfileImageView = null;
+    private StackPane accountSettingsProfileContainer = null;
+    private Label accountSettingsInitialsLabel = null;
+    
+    private void handleProfilePictureUpload(ImageView profileImageView) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Select Profile Picture");
+        fileChooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("Image Files", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp")
+        );
+        
+        Stage stage = (Stage) dashboardContent.getScene().getWindow();
+        File selectedFile = fileChooser.showOpenDialog(stage);
+        
+        if (selectedFile != null) {
+            // Check file size (3 MB = 3 * 1024 * 1024 bytes)
+            long fileSize = selectedFile.length();
+            long maxSize = 3 * 1024 * 1024;
+            
+            if (fileSize > maxSize) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("File Too Large");
+                alert.setHeaderText("Profile picture size exceeds limit");
+                alert.setContentText("Please select an image file smaller than 3 MB.");
+                alert.showAndWait();
+                return;
+            }
+            
+            // Validate it's an image file
+            try {
+                BufferedImage image = ImageIO.read(selectedFile);
+                if (image == null) {
+                    throw new IOException("Invalid image file");
+                }
+                
+                // Store the selected file
+                selectedProfilePictureFile = selectedFile;
+                
+                // Display preview - circular
+                Image previewImage = new Image(selectedFile.toURI().toString(), 150, 150, true, true, true);
+                profileImageView.setImage(previewImage);
+                profileImageView.setVisible(true);
+                
+                // Hide initials label if visible and update container
+                if (accountSettingsInitialsLabel != null) {
+                    accountSettingsInitialsLabel.setVisible(false);
+                }
+                if (accountSettingsProfileContainer != null) {
+                    accountSettingsProfileContainer.setStyle("-fx-background-color: transparent; -fx-background-radius: 75;");
+                }
+                
+            } catch (IOException e) {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Invalid Image");
+                alert.setHeaderText("Failed to load image");
+                alert.setContentText("Please select a valid image file.");
+                alert.showAndWait();
+            }
+        }
+    }
+    
+    private void handleSaveProfile(String fullName, ImageView profileImageView, Button saveButton) {
+        // Validate name
+        if (fullName == null || fullName.trim().isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Validation Error");
+            alert.setHeaderText("Full name is required");
+            alert.setContentText("Please enter your full name.");
+            alert.showAndWait();
+            return;
+        }
+        
+        // Disable save button
+        if (saveButton != null) {
+            saveButton.setDisable(true);
+            saveButton.setText("Saving...");
+        }
+        
+        // Save in background thread
+        new Thread(() -> {
+            try {
+                String profilePicturePath = null;
+                
+                // Handle profile picture upload if a new one was selected
+                if (selectedProfilePictureFile != null) {
+                    // Create uploads directory if it doesn't exist
+                    File uploadsDir = new File("uploads/profile-pictures");
+                    if (!uploadsDir.exists()) {
+                        uploadsDir.mkdirs();
+                    }
+                    
+                    // Generate unique filename
+                    String originalFilename = selectedProfilePictureFile.getName();
+                    String extension = "";
+                    if (originalFilename.contains(".")) {
+                        extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+                    }
+                    String filename = currentUser.getId() + "_" + System.currentTimeMillis() + extension;
+                    
+                    // Copy file to uploads directory
+                    File targetFile = new File(uploadsDir, filename);
+                    Files.copy(selectedProfilePictureFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    
+                    // Delete old profile picture if exists
+                    if (currentUser.getProfilePicture() != null && !currentUser.getProfilePicture().isEmpty()) {
+                        File oldFile = new File(currentUser.getProfilePicture());
+                        if (oldFile.exists()) {
+                            oldFile.delete();
+                        }
+                    }
+                    
+                    profilePicturePath = "uploads/profile-pictures/" + filename;
+                }
+                
+                // Update teacher profile using service
+                UserDto updatedUser = teacherService.updateTeacherProfile(
+                    currentUser.getId(),
+                    fullName,
+                    profilePicturePath
+                );
+                
+                // Update current user
+                currentUser = updatedUser;
+                
+                // Reset selected file
+                selectedProfilePictureFile = null;
+                
+                // Update header labels and profile picture
+                Platform.runLater(() -> {
+                    if (userNameLabel != null) {
+                        userNameLabel.setText(updatedUser.getFullName());
+                    }
+                    
+                    // Reload profile picture in header
+                    loadProfilePicture();
+                    
+                    // Show success message
+                    Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                    alert.setTitle("Success");
+                    alert.setHeaderText("Profile updated successfully");
+                    alert.setContentText("Your profile has been updated.");
+                    alert.showAndWait();
+                    
+                    // Reload account settings page to show updated info
+                    loadAccountSettingsPage();
+                });
+                
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Error");
+                    alert.setHeaderText("Failed to update profile");
+                    alert.setContentText("Error: " + e.getMessage());
+                    alert.showAndWait();
+                    
+                    // Re-enable save button
+                    if (saveButton != null) {
+                        saveButton.setDisable(false);
+                        saveButton.setText("💾 Save Changes");
+                    }
+                });
+            }
+        }).start();
     }
     
     private VBox createSummaryCard(String title, String value, String color) {
@@ -1249,4 +1661,5 @@ public class TeacherDashboardController {
         }
     }
 }
+
 

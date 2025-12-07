@@ -4,6 +4,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
+<?import javafx.scene.image.ImageView?>
 
 <BorderPane xmlns="http://javafx.com/javafx/17" 
             xmlns:fx="http://javafx.com/fxml/1" 
@@ -14,11 +15,44 @@
     <top>
         <HBox alignment="CENTER_LEFT" spacing="20" 
               style="-fx-background-color: #2c3e50; -fx-padding: 15 30;">
-            <HBox spacing="10" HBox.hgrow="ALWAYS">
-                <Label fx:id="userNameLabel" text="Welcome, User" 
-                       style="-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;"/>
-                <Label fx:id="userRoleLabel" text="(Role)" 
+            <!-- Title on Left -->
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="📊" style="-fx-font-size: 24px;"/>
+                <Label text="Teacher's Dashboard" 
+                       style="-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold;"/>
+            </HBox>
+            
+            <!-- Spacer -->
+            <Region HBox.hgrow="ALWAYS"/>
+            
+            <!-- Date/Time and User Info on Right -->
+            <HBox spacing="20" alignment="CENTER_RIGHT">
+                <!-- Date/Time -->
+                <Label fx:id="dateTimeLabel" text="Dec 7, 2025, 6:30 PM" 
                        style="-fx-text-fill: #bdc3c7; -fx-font-size: 14px;"/>
+                
+                <!-- User Info with Profile Picture -->
+                <HBox spacing="10" alignment="CENTER_RIGHT">
+                    <!-- Circular Profile Picture -->
+                    <StackPane fx:id="profilePictureContainer" 
+                               style="-fx-background-color: #3498db; -fx-background-radius: 20; -fx-pref-width: 40; -fx-pref-height: 40;">
+                        <ImageView fx:id="profileImageView" 
+                                   fitWidth="40" fitHeight="40" 
+                                   preserveRatio="true" 
+                                   style="-fx-background-radius: 20;"/>
+                        <Label fx:id="profileInitialsLabel" 
+                               text="U" 
+                               style="-fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold;"/>
+                    </StackPane>
+                    
+                    <!-- Name and Role -->
+                    <VBox spacing="2" alignment="CENTER_LEFT">
+                        <Label fx:id="userNameLabel" text="User Name" 
+                               style="-fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;"/>
+                        <Label fx:id="userRoleLabel" text="Role" 
+                               style="-fx-text-fill: #bdc3c7; -fx-font-size: 12px;"/>
+                    </VBox>
+                </HBox>
             </HBox>
         </HBox>
     </top>
@@ -44,9 +78,6 @@
                         style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
                 
                 <Button fx:id="btnMyStudents" text="  👥 My Students" onAction="#showMyStudents"
-                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
-                
-                <Button fx:id="btnReports" text="  📊 Reports" onAction="#showReports"
                         style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
                 
                 <Button fx:id="btnAccountSettings" text="  ⚙️ Account Settings" onAction="#showAccountSettings"

@@ -15,6 +15,7 @@ public class UserDto {
     private String roleDisplayName;
     private Boolean isActive;
     private LocalDateTime lastLogin;
+    private String profilePicture;
     
     // Constructors
     public UserDto() {
@@ -34,7 +35,7 @@ public class UserDto {
     
     // Static factory method
     public static UserDto fromUser(User user) {
-        return new UserDto(
+        UserDto dto = new UserDto(
             user.getId(),
             user.getUsername(),
             user.getFullName(),
@@ -44,6 +45,8 @@ public class UserDto {
             user.getIsActive(),
             user.getLastLogin()
         );
+        dto.setProfilePicture(user.getProfilePicture());
+        return dto;
     }
     
     // Getters and Setters
@@ -117,5 +120,13 @@ public class UserDto {
     
     public void setLastLogin(LocalDateTime lastLogin) {
         this.lastLogin = lastLogin;
+    }
+    
+    public String getProfilePicture() {
+        return profilePicture;
+    }
+    
+    public void setProfilePicture(String profilePicture) {
+        this.profilePicture = profilePicture;
     }
 }

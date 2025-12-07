@@ -137,6 +137,33 @@ public class TeacherService {
             teacher.setIsActive(teacherDto.getIsActive());
         }
         
+        // Update profile picture if provided
+        if (teacherDto.getProfilePicture() != null) {
+            teacher.setProfilePicture(teacherDto.getProfilePicture());
+        }
+        
+        teacher.setUpdatedAt(LocalDateTime.now());
+        
+        User updatedTeacher = userRepository.save(teacher);
+        return UserDto.fromUser(updatedTeacher);
+    }
+    
+    @Transactional
+    public UserDto updateTeacherProfile(Long id, String fullName, String profilePicture) {
+        User teacher = userRepository.findById(id)
+                .filter(user -> user.getRole() == User.UserRole.TEACHER)
+                .orElseThrow(() -> new RuntimeException("Teacher not found with id: " + id));
+        
+        // Update full name if provided
+        if (fullName != null && !fullName.trim().isEmpty()) {
+            teacher.setFullName(fullName.trim());
+        }
+        
+        // Update profile picture if provided
+        if (profilePicture != null) {
+            teacher.setProfilePicture(profilePicture);
+        }
+        
         teacher.setUpdatedAt(LocalDateTime.now());
         
         User updatedTeacher = userRepository.save(teacher);
