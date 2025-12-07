@@ -55,14 +55,12 @@ public class EnrollmentSummaryController implements Initializable {
     private ReportService reportService;
     
     private EnrollmentStatistics statistics;
-    private VBox contentContainer;
     
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        contentContainer = new VBox(20);
-        contentContainer.setPadding(new Insets(20));
-        scrollPane.setContent(contentContainer);
         scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setStyle("-fx-background-color: #ecf0f1; -fx-border-color: transparent;");
         
         loadData();
     }
@@ -89,101 +87,216 @@ public class EnrollmentSummaryController implements Initializable {
     }
     
     private void buildSummaryView() {
-        contentContainer.getChildren().clear();
+        // Main container - vertical layout
+        VBox mainContainer = new VBox(12);
+        mainContainer.setPadding(new Insets(12));
+        mainContainer.setStyle("-fx-background-color: #ecf0f1;");
         
-        // Title
-        Label titleLabel = new Label("📊 Enrollment Summary / Statistics");
-        titleLabel.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-        contentContainer.getChildren().add(titleLabel);
+        // TOP ROW: Summary Cards
+        HBox summaryCards = new HBox(15);
+        summaryCards.setAlignment(Pos.CENTER);
+        summaryCards.setPrefWidth(Region.USE_COMPUTED_SIZE);
         
-        // Summary Cards
-        HBox summaryCards = new HBox(20);
-        summaryCards.setAlignment(Pos.CENTER_LEFT);
-        summaryCards.getChildren().addAll(
-            createStatCard("Total Enrolled", String.valueOf(statistics.totalEnrolled), "#3498db"),
-            createStatCard("Pending Applications", String.valueOf(statistics.totalPending), "#f39c12")
-        );
-        contentContainer.getChildren().add(summaryCards);
+        VBox totalEnrolledCard = createStatCard("Total Enrolled", String.valueOf(statistics.totalEnrolled));
+        VBox pendingCard = createStatCard("Pending Applications", String.valueOf(statistics.totalPending));
         
-        // Charts Row 1: Grade Level and Strand
-        HBox chartsRow1 = new HBox(20);
-        chartsRow1.setAlignment(Pos.CENTER_LEFT);
+        // Make cards larger to match bigger graphs
+        totalEnrolledCard.setPrefWidth(350);
+        pendingCard.setPrefWidth(350);
+        totalEnrolledCard.setMaxWidth(350);
+        pendingCard.setMaxWidth(350);
         
-        // Grade Level Bar Chart
-        BarChart<String, Number> gradeLevelChart = createGradeLevelChart();
-        gradeLevelChart.setPrefWidth(500);
-        gradeLevelChart.setPrefHeight(400);
+        summaryCards.getChildren().addAll(totalEnrolledCard, pendingCard);
+        mainContainer.getChildren().add(summaryCards);
         
-        // Strand Bar Chart
-        BarChart<String, Number> strandChart = createStrandChart();
-        strandChart.setPrefWidth(500);
-        strandChart.setPrefHeight(400);
+        // BOTTOM SECTION: 2x2 Grid of Graphs - Bigger size
+        GridPane chartsGrid = new GridPane();
+        chartsGrid.setHgap(15);
+        chartsGrid.setVgap(15);
+        chartsGrid.setAlignment(Pos.CENTER);
+        chartsGrid.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        GridPane.setHgrow(chartsGrid, Priority.ALWAYS);
         
-        chartsRow1.getChildren().addAll(gradeLevelChart, strandChart);
-        contentContainer.getChildren().add(chartsRow1);
+        // Grade Level Chart - Bigger size
+        VBox gradeLevelContainer = createChartContainer("Students by Grade Level", createGradeLevelChart());
+        gradeLevelContainer.setPrefWidth(400);
+        gradeLevelContainer.setPrefHeight(280);
+        gradeLevelContainer.setMaxWidth(400);
+        gradeLevelContainer.setMaxHeight(280);
+        chartsGrid.add(gradeLevelContainer, 0, 0);
         
-        // Charts Row 2: Gender Pie Chart and Section Chart
-        HBox chartsRow2 = new HBox(20);
-        chartsRow2.setAlignment(Pos.CENTER_LEFT);
+        // Strand Chart - Bigger size
+        VBox strandContainer = createChartContainer("Students by Strand", createStrandChart());
+        strandContainer.setPrefWidth(400);
+        strandContainer.setPrefHeight(280);
+        strandContainer.setMaxWidth(400);
+        strandContainer.setMaxHeight(280);
+        chartsGrid.add(strandContainer, 1, 0);
         
-        // Gender Pie Chart
-        PieChart genderChart = createGenderChart();
-        genderChart.setPrefWidth(500);
-        genderChart.setPrefHeight(400);
+        // Gender Pie Chart - Bigger size
+        VBox genderContainer = createChartContainer("Students by Gender", createGenderChart());
+        genderContainer.setPrefWidth(400);
+        genderContainer.setPrefHeight(280);
+        genderContainer.setMaxWidth(400);
+        genderContainer.setMaxHeight(280);
+        chartsGrid.add(genderContainer, 0, 1);
         
-        // Section Bar Chart
-        BarChart<String, Number> sectionChart = createSectionChart();
-        sectionChart.setPrefWidth(500);
-        sectionChart.setPrefHeight(400);
+        // Enrollment Status Chart - 4th graph showing Enrolled vs Pending
+        VBox statusContainer = createChartContainer("Enrollment Status", createEnrollmentStatusChart());
+        statusContainer.setPrefWidth(400);
+        statusContainer.setPrefHeight(280);
+        statusContainer.setMaxWidth(400);
+        statusContainer.setMaxHeight(280);
+        chartsGrid.add(statusContainer, 1, 1);
         
-        chartsRow2.getChildren().addAll(genderChart, sectionChart);
-        contentContainer.getChildren().add(chartsRow2);
+        mainContainer.getChildren().add(chartsGrid);
+        VBox.setVgrow(chartsGrid, Priority.ALWAYS);
         
-        // Statistics Tables
-        VBox tablesContainer = new VBox(20);
-        
-        // Grade Level Table
-        if (statistics.byGradeLevel != null && !statistics.byGradeLevel.isEmpty()) {
-            Label gradeLabel = new Label("Students by Grade Level");
-            gradeLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-            tablesContainer.getChildren().add(gradeLabel);
-            tablesContainer.getChildren().add(createStatisticsTable("Grade Level", "Count", statistics.byGradeLevel));
-        }
-        
-        // Strand Table
-        if (statistics.byStrand != null && !statistics.byStrand.isEmpty()) {
-            Label strandLabel = new Label("Students by Strand");
-            strandLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-            tablesContainer.getChildren().add(strandLabel);
-            tablesContainer.getChildren().add(createStatisticsTable("Strand", "Count", statistics.byStrand));
-        }
-        
-        contentContainer.getChildren().add(tablesContainer);
+        // Set as content - no scrolling needed
+        scrollPane.setContent(mainContainer);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setFitToHeight(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
     }
     
-    private VBox createStatCard(String title, String value, String color) {
-        VBox card = new VBox(10);
-        card.setAlignment(Pos.CENTER);
-        card.setPadding(new Insets(25));
-        card.setPrefWidth(250);
-        card.setPrefHeight(150);
-        card.setStyle(
+    private Label createTableLabel(String text) {
+        Label label = new Label(text);
+        label.setStyle(
+            "-fx-font-size: 14px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #2c3e50; " +
+            "-fx-padding: 8 12; " +
+            "-fx-background-color: #34495e; " +
+            "-fx-background-radius: 6; " +
+            "-fx-text-fill: white;"
+        );
+        return label;
+    }
+    
+    private VBox createChartContainer(String title, javafx.scene.Node chart) {
+        VBox container = new VBox(8);
+        container.setPadding(new Insets(12));
+        container.setStyle(
             "-fx-background-color: white; " +
-            "-fx-background-radius: 15; " +
-            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 3);"
+            "-fx-background-radius: 8; " +
+            "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.1), 5, 0, 0, 2); " +
+            "-fx-border-color: #bdc3c7; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 8;"
         );
         
         Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #7f8c8d; -fx-font-weight: bold;");
+        titleLabel.setStyle(
+            "-fx-font-size: 12px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #2c3e50; " +
+            "-fx-padding: 6 10; " +
+            "-fx-background-color: #ecf0f1; " +
+            "-fx-background-radius: 4;"
+        );
+        
+        // Set chart size - bigger to fill screen
+        if (chart instanceof BarChart) {
+            ((BarChart<?, ?>) chart).setPrefWidth(380);
+            ((BarChart<?, ?>) chart).setPrefHeight(250);
+        } else if (chart instanceof PieChart) {
+            ((PieChart) chart).setPrefWidth(380);
+            ((PieChart) chart).setPrefHeight(250);
+        }
+        
+        container.getChildren().addAll(titleLabel, chart);
+        
+        // Subtle hover effect matching sidebar theme
+        container.setOnMouseEntered(e -> {
+            container.setStyle(
+                "-fx-background-color: white; " +
+                "-fx-background-radius: 8; " +
+                "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.15), 8, 0, 0, 3); " +
+                "-fx-border-color: #34495e; " +
+                "-fx-border-width: 2; " +
+                "-fx-border-radius: 8; " +
+                "-fx-cursor: hand;"
+            );
+        });
+        
+        container.setOnMouseExited(e -> {
+            container.setStyle(
+                "-fx-background-color: white; " +
+                "-fx-background-radius: 8; " +
+                "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.1), 5, 0, 0, 2); " +
+                "-fx-border-color: #bdc3c7; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: 8; " +
+                "-fx-cursor: default;"
+            );
+        });
+        
+        return container;
+    }
+    
+    private VBox createStatCard(String title, String value) {
+        VBox card = new VBox(6);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(15));
+        card.setPrefHeight(120); // Compact height for summary cards
+        card.setMinHeight(120);
+        card.setMaxHeight(120);
+        
+        // Use sidebar theme colors - same style as graph containers
+        card.setStyle(
+            "-fx-background-color: white; " +
+            "-fx-background-radius: 8; " +
+            "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.1), 5, 0, 0, 2); " +
+            "-fx-border-color: #bdc3c7; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 8;"
+        );
+        
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(
+            "-fx-font-size: 12px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #2c3e50; " +
+            "-fx-padding: 6 10; " +
+            "-fx-background-color: #ecf0f1; " +
+            "-fx-background-radius: 4;"
+        );
         
         Label valueLabel = new Label(value);
         valueLabel.setStyle(
-            "-fx-font-size: 48px; " +
+            "-fx-font-size: 36px; " +
             "-fx-font-weight: bold; " +
-            "-fx-text-fill: " + color + ";"
+            "-fx-text-fill: #2c3e50;"
         );
         
         card.getChildren().addAll(titleLabel, valueLabel);
+        
+        // Subtle hover effect matching sidebar theme - same as graph containers
+        card.setOnMouseEntered(e -> {
+            card.setStyle(
+                "-fx-background-color: white; " +
+                "-fx-background-radius: 8; " +
+                "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.15), 8, 0, 0, 3); " +
+                "-fx-border-color: #34495e; " +
+                "-fx-border-width: 2; " +
+                "-fx-border-radius: 8; " +
+                "-fx-cursor: hand;"
+            );
+        });
+        
+        card.setOnMouseExited(e -> {
+            card.setStyle(
+                "-fx-background-color: white; " +
+                "-fx-background-radius: 8; " +
+                "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.1), 5, 0, 0, 2); " +
+                "-fx-border-color: #bdc3c7; " +
+                "-fx-border-width: 1; " +
+                "-fx-border-radius: 8; " +
+                "-fx-cursor: default;"
+            );
+        });
+        
         return card;
     }
     
@@ -191,16 +304,43 @@ public class EnrollmentSummaryController implements Initializable {
         CategoryAxis xAxis = new CategoryAxis();
         NumberAxis yAxis = new NumberAxis();
         BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
-        chart.setTitle("Students by Grade Level");
+        chart.setTitle("");
         chart.setLegendVisible(false);
+        chart.setAnimated(false);
+        
+        // Style axes
+        xAxis.setStyle("-fx-tick-label-font-size: 11px; -fx-tick-label-fill: #2c3e50;");
+        yAxis.setStyle("-fx-tick-label-font-size: 11px; -fx-tick-label-fill: #2c3e50;");
+        
+        // Sidebar theme colors for grade levels - subtle variations
+        String[] colors = {"#2c3e50", "#34495e", "#3d4f5f", "#2c3e50", "#34495e", "#3d4f5f"};
         
         XYChart.Series<String, Number> series = new XYChart.Series<>();
         if (statistics.byGradeLevel != null) {
-            statistics.byGradeLevel.entrySet().stream()
-                    .sorted(Map.Entry.comparingByKey())
-                    .forEach(entry -> series.getData().add(new XYChart.Data<>("Grade " + entry.getKey(), entry.getValue())));
+            List<Map.Entry<Integer, Long>> sortedEntries = new ArrayList<>(statistics.byGradeLevel.entrySet());
+            sortedEntries.sort(Map.Entry.comparingByKey());
+            
+            for (Map.Entry<Integer, Long> entry : sortedEntries) {
+                XYChart.Data<String, Number> data = new XYChart.Data<>("G" + entry.getKey(), entry.getValue());
+                series.getData().add(data);
+            }
         }
         chart.getData().add(series);
+        
+        // Apply colors to bars when nodes are available
+        chart.getData().get(0).getData().forEach(data -> {
+            int index = chart.getData().get(0).getData().indexOf(data);
+            String color = colors[index % colors.length];
+            data.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                if (newNode != null) {
+                    newNode.setStyle("-fx-bar-fill: " + color + ";");
+                }
+            });
+            // Try to apply immediately if node already exists
+            if (data.getNode() != null) {
+                data.getNode().setStyle("-fx-bar-fill: " + color + ";");
+            }
+        });
         
         return chart;
     }
@@ -209,23 +349,76 @@ public class EnrollmentSummaryController implements Initializable {
         CategoryAxis xAxis = new CategoryAxis();
         NumberAxis yAxis = new NumberAxis();
         BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
-        chart.setTitle("Students by Strand");
+        chart.setTitle("");
         chart.setLegendVisible(false);
+        chart.setAnimated(false);
+        
+        // Style axes
+        xAxis.setStyle("-fx-tick-label-font-size: 10px; -fx-tick-label-fill: #2c3e50;");
+        yAxis.setStyle("-fx-tick-label-font-size: 11px; -fx-tick-label-fill: #2c3e50;");
+        
+        // Sidebar theme colors for strands - subtle variations
+        Map<String, String> strandColors = new HashMap<>();
+        strandColors.put("ABM", "#2c3e50");      // Dark
+        strandColors.put("HUMSS", "#34495e");    // Medium
+        strandColors.put("STEM", "#3d4f5f");     // Lighter
+        strandColors.put("GAS", "#2c3e50");      // Dark
+        strandColors.put("TVL", "#34495e");      // Medium
         
         XYChart.Series<String, Number> series = new XYChart.Series<>();
         if (statistics.byStrand != null) {
-            statistics.byStrand.entrySet().stream()
-                    .sorted(Map.Entry.comparingByKey())
-                    .forEach(entry -> series.getData().add(new XYChart.Data<>(entry.getKey(), entry.getValue())));
+            List<Map.Entry<String, Long>> sortedEntries = new ArrayList<>(statistics.byStrand.entrySet());
+            sortedEntries.sort(Map.Entry.comparingByKey());
+            
+            for (Map.Entry<String, Long> entry : sortedEntries) {
+                String strandName = entry.getKey();
+                // Shorten long strand names
+                if (strandName.length() > 12) {
+                    strandName = strandName.substring(0, 9) + "...";
+                }
+                XYChart.Data<String, Number> data = new XYChart.Data<>(strandName, entry.getValue());
+                series.getData().add(data);
+            }
         }
         chart.getData().add(series);
+        
+        // Apply strand-specific colors when nodes are available
+        if (statistics.byStrand != null) {
+            List<Map.Entry<String, Long>> sortedEntries = new ArrayList<>(statistics.byStrand.entrySet());
+            sortedEntries.sort(Map.Entry.comparingByKey());
+            
+            for (int i = 0; i < chart.getData().get(0).getData().size(); i++) {
+                String strand = sortedEntries.get(i).getKey();
+                String color = strandColors.getOrDefault(strand.toUpperCase(), "#3498db");
+                XYChart.Data<String, Number> data = chart.getData().get(0).getData().get(i);
+                data.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                    if (newNode != null) {
+                        newNode.setStyle("-fx-bar-fill: " + color + ";");
+                    }
+                });
+                // Try to apply immediately if node already exists
+                if (data.getNode() != null) {
+                    data.getNode().setStyle("-fx-bar-fill: " + color + ";");
+                }
+            }
+        }
         
         return chart;
     }
     
     private PieChart createGenderChart() {
         PieChart chart = new PieChart();
-        chart.setTitle("Students by Gender");
+        chart.setTitle("");
+        chart.setLabelsVisible(true);
+        chart.setLabelLineLength(10);
+        chart.setAnimated(false);
+        
+        // Sidebar theme colors for gender - subtle variations
+        Map<String, String> genderColors = new HashMap<>();
+        genderColors.put("Male", "#2c3e50");      // Dark
+        genderColors.put("Female", "#34495e");    // Medium
+        genderColors.put("M", "#2c3e50");
+        genderColors.put("F", "#34495e");
         
         if (statistics.byGender != null) {
             statistics.byGender.forEach((gender, count) -> {
@@ -234,50 +427,88 @@ public class EnrollmentSummaryController implements Initializable {
             });
         }
         
+        // Apply colors to pie slices after chart is rendered
+        chart.getData().forEach(data -> {
+            // Use a listener to apply color when node is available
+            data.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                if (newNode != null) {
+                    String gender = data.getName().split(" ")[0];
+                    String color = genderColors.getOrDefault(gender, "#95a5a6");
+                    newNode.setStyle("-fx-pie-color: " + color + ";");
+                }
+            });
+        });
+        
         return chart;
     }
     
-    private BarChart<String, Number> createSectionChart() {
-        CategoryAxis xAxis = new CategoryAxis();
-        NumberAxis yAxis = new NumberAxis();
-        BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
-        chart.setTitle("Students by Section");
-        chart.setLegendVisible(false);
+    private PieChart createEnrollmentStatusChart() {
+        PieChart chart = new PieChart();
+        chart.setTitle("");
+        chart.setLabelsVisible(true);
+        chart.setLabelLineLength(10);
+        chart.setAnimated(false);
         
-        XYChart.Series<String, Number> series = new XYChart.Series<>();
-        if (statistics.bySection != null) {
-            statistics.bySection.entrySet().stream()
-                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                    .limit(10) // Top 10 sections
-                    .forEach(entry -> {
-                        String shortName = entry.getKey();
-                        if (shortName.length() > 20) {
-                            shortName = shortName.substring(0, 17) + "...";
-                        }
-                        series.getData().add(new XYChart.Data<>(shortName, entry.getValue()));
-                    });
+        // Sidebar theme colors for enrollment status
+        Map<String, String> statusColors = new HashMap<>();
+        statusColors.put("Enrolled", "#27ae60");    // Green for enrolled
+        statusColors.put("Pending", "#e67e22");      // Orange for pending
+        
+        // Add enrolled slice
+        if (statistics.totalEnrolled > 0) {
+            PieChart.Data enrolledSlice = new PieChart.Data("Enrolled (" + statistics.totalEnrolled + ")", statistics.totalEnrolled);
+            chart.getData().add(enrolledSlice);
         }
-        chart.getData().add(series);
+        
+        // Add pending slice
+        if (statistics.totalPending > 0) {
+            PieChart.Data pendingSlice = new PieChart.Data("Pending (" + statistics.totalPending + ")", statistics.totalPending);
+            chart.getData().add(pendingSlice);
+        }
+        
+        // Apply colors to pie slices
+        chart.getData().forEach(data -> {
+            data.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                if (newNode != null) {
+                    String status = data.getName().split(" ")[0];
+                    String color = statusColors.getOrDefault(status, "#95a5a6");
+                    newNode.setStyle("-fx-pie-color: " + color + ";");
+                }
+            });
+        });
         
         return chart;
     }
     
-    private TableView<Map<String, String>> createStatisticsTable(String col1Header, String col2Header, Map<?, Long> data) {
+    private TableView<Map<String, String>> createStatisticsTable(String col1Header, String col2Header, Map<?, Long> data, VBox container) {
         TableView<Map<String, String>> table = new TableView<>();
+        table.setStyle(
+            "-fx-background-color: white; " +
+            "-fx-background-radius: 8; " +
+            "-fx-border-color: #bdc3c7; " +
+            "-fx-border-width: 1; " +
+            "-fx-border-radius: 8; " +
+            "-fx-table-header-border-color: transparent; " +
+            "-fx-table-cell-border-color: #ecf0f1;"
+        );
         
         TableColumn<Map<String, String>, String> col1 = new TableColumn<>(col1Header);
         col1.setCellValueFactory(rowData -> {
             Map<String, String> row = rowData.getValue();
             return new javafx.beans.property.SimpleStringProperty(row.get("key"));
         });
-        col1.setPrefWidth(300);
+        // Auto-adjust width - use 60% of available space
+        col1.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        col1.setMinWidth(200);
         
         TableColumn<Map<String, String>, String> col2 = new TableColumn<>(col2Header);
         col2.setCellValueFactory(rowData -> {
             Map<String, String> row = rowData.getValue();
             return new javafx.beans.property.SimpleStringProperty(row.get("value"));
         });
-        col2.setPrefWidth(150);
+        // Auto-adjust width - use 40% of available space
+        col2.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        col2.setMinWidth(100);
         
         @SuppressWarnings("unchecked")
         TableColumn<Map<String, String>, String>[] columns = new TableColumn[] {col1, col2};
@@ -294,8 +525,100 @@ public class EnrollmentSummaryController implements Initializable {
                 });
         
         table.setItems(tableData);
-        table.setPrefHeight(200);
-        table.setStyle("-fx-background-color: white;");
+        // Auto-resize columns to fit content
+        table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        
+        // Set columns to grow proportionally
+        col1.prefWidthProperty().bind(table.widthProperty().multiply(0.6));
+        col2.prefWidthProperty().bind(table.widthProperty().multiply(0.4));
+        
+        // If container is provided, calculate fixed cell size to fill available height
+        if (container != null) {
+            int rowCount = tableData.size();
+            if (rowCount > 0) {
+                // Use a listener to update cell size when container height changes
+                container.heightProperty().addListener((obs, oldHeight, newHeight) -> {
+                    if (newHeight.doubleValue() > 0) {
+                        // Subtract label height (~40px) and spacing (~10px)
+                        double availableHeight = newHeight.doubleValue() - 50;
+                        double cellSize = Math.max(25, availableHeight / rowCount);
+                        table.setFixedCellSize(cellSize);
+                    }
+                });
+                // Set initial cell size
+                Platform.runLater(() -> {
+                    if (container.getHeight() > 0) {
+                        double availableHeight = container.getHeight() - 50;
+                        double cellSize = Math.max(25, availableHeight / rowCount);
+                        table.setFixedCellSize(cellSize);
+                    } else {
+                        // Fallback: use reasonable default
+                        table.setFixedCellSize(30);
+                    }
+                });
+            } else {
+                table.setFixedCellSize(30);
+            }
+        } else {
+            // Default cell size for tables without container binding
+            table.setFixedCellSize(30);
+        }
+        
+        // Style cells with sidebar theme - ensure text is fully visible
+        col1.setCellFactory(column -> {
+            return new javafx.scene.control.TableCell<Map<String, String>, String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        setText(item);
+                        setStyle(
+                            "-fx-font-size: 12px; " +
+                            "-fx-text-fill: #2c3e50; " +
+                            "-fx-padding: 10; " +
+                            "-fx-background-color: white; " +
+                            "-fx-wrap-text: true;"
+                        );
+                    }
+                }
+            };
+        });
+        
+        col2.setCellFactory(column -> {
+            return new javafx.scene.control.TableCell<Map<String, String>, String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                        setStyle("");
+                    } else {
+                        setText(item);
+                        setStyle(
+                            "-fx-font-size: 13px; " +
+                            "-fx-text-fill: #2c3e50; " +
+                            "-fx-font-weight: bold; " +
+                            "-fx-padding: 10; " +
+                            "-fx-background-color: #ecf0f1; " +
+                            "-fx-alignment: center;"
+                        );
+                    }
+                }
+            };
+        });
+        
+        // Style header with sidebar theme
+        Platform.runLater(() -> {
+            javafx.scene.Node header = table.lookup(".column-header-background");
+            if (header != null) {
+                header.setStyle(
+                    "-fx-background-color: #34495e;"
+                );
+            }
+        });
         
         return table;
     }
@@ -388,22 +711,26 @@ public class EnrollmentSummaryController implements Initializable {
     
     private void generatePDF(File file) throws IOException {
         try (PDDocument document = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.A4);
+            // Use landscape orientation (swap width and height)
+            PDPage page = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth()));
             document.addPage(page);
             
-            try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
-                float margin = 50;
-                float yPosition = 750;
+            PDPageContentStream contentStream = new PDPageContentStream(document, page);
+            try {
+                float margin = 40;
+                float pageWidth = page.getMediaBox().getWidth();
+                float pageHeight = page.getMediaBox().getHeight();
+                float yPosition = pageHeight - margin;
                 
-                // Use default fonts - PDFBox 3.0.1 uses different API
+                // Use default fonts
                 PDType1Font fontBold = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
                 PDType1Font font = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA);
                 
                 // Title
                 contentStream.beginText();
-                contentStream.setFont(fontBold, 16);
+                contentStream.setFont(fontBold, 18);
                 contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("ENROLLMENT SUMMARY / STATISTICS");
+                contentStream.showText("ENROLLMENT SUMMARY REPORT");
                 contentStream.endText();
                 
                 yPosition -= 25;
@@ -415,190 +742,394 @@ public class EnrollmentSummaryController implements Initializable {
                 contentStream.showText("Generated: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM dd, yyyy")));
                 contentStream.endText();
                 
-                yPosition -= 30;
+                yPosition -= 35;
                 
-                // Summary
-                contentStream.beginText();
-                contentStream.setFont(fontBold, 12);
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("Summary");
-                contentStream.endText();
+                // Table settings
+                float tableStartX = margin;
+                float tableWidth = pageWidth - (2 * margin);
+                float rowHeight = 22;
+                float col1Width = tableWidth * 0.7f;
+                float col2Width = tableWidth * 0.3f;
                 
+                // Summary Table
+                yPosition = drawTablePDF(contentStream, fontBold, font, tableStartX, yPosition, tableWidth, col1Width, col2Width, rowHeight,
+                    "SUMMARY",
+                    Arrays.asList(
+                        new String[]{"Total Enrolled", String.valueOf(statistics.totalEnrolled)},
+                        new String[]{"Pending Applications", String.valueOf(statistics.totalPending)}
+                    ));
                 yPosition -= 20;
-                contentStream.setFont(font, 10);
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("Total Enrolled: " + statistics.totalEnrolled);
-                contentStream.endText();
                 
-                yPosition -= 15;
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("Pending Applications: " + statistics.totalPending);
-                contentStream.endText();
-                
-                yPosition -= 30;
-                
-                // By Grade Level
+                // Grade Level Table
                 if (statistics.byGradeLevel != null && !statistics.byGradeLevel.isEmpty()) {
-                    contentStream.setFont(fontBold, 12);
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(margin, yPosition);
-                    contentStream.showText("Students by Grade Level");
-                    contentStream.endText();
-                    
+                    yPosition = drawTablePDF(contentStream, fontBold, font, tableStartX, yPosition, tableWidth, col1Width, col2Width, rowHeight,
+                        "STUDENTS BY GRADE LEVEL",
+                        statistics.byGradeLevel.entrySet().stream()
+                            .sorted(Map.Entry.comparingByKey())
+                            .map(e -> new String[]{"Grade " + e.getKey(), String.valueOf(e.getValue())})
+                            .collect(java.util.stream.Collectors.toList()));
                     yPosition -= 20;
-                    contentStream.setFont(font, 10);
-                    for (Map.Entry<Integer, Long> entry : statistics.byGradeLevel.entrySet()) {
-                        contentStream.beginText();
-                        contentStream.newLineAtOffset(margin + 20, yPosition);
-                        contentStream.showText("Grade " + entry.getKey() + ": " + entry.getValue());
-                        contentStream.endText();
-                        yPosition -= 15;
-                    }
-                    yPosition -= 10;
                 }
                 
-                // By Strand
+                // Strand Table
                 if (statistics.byStrand != null && !statistics.byStrand.isEmpty()) {
-                    contentStream.setFont(fontBold, 12);
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(margin, yPosition);
-                    contentStream.showText("Students by Strand");
-                    contentStream.endText();
-                    
+                    yPosition = drawTablePDF(contentStream, fontBold, font, tableStartX, yPosition, tableWidth, col1Width, col2Width, rowHeight,
+                        "STUDENTS BY STRAND",
+                        statistics.byStrand.entrySet().stream()
+                            .sorted(Map.Entry.comparingByKey())
+                            .map(e -> new String[]{e.getKey(), String.valueOf(e.getValue())})
+                            .collect(java.util.stream.Collectors.toList()));
                     yPosition -= 20;
-                    contentStream.setFont(font, 10);
-                    for (Map.Entry<String, Long> entry : statistics.byStrand.entrySet()) {
-                        contentStream.beginText();
-                        contentStream.newLineAtOffset(margin + 20, yPosition);
-                        contentStream.showText(entry.getKey() + ": " + entry.getValue());
-                        contentStream.endText();
-                        yPosition -= 15;
-                    }
-                    yPosition -= 10;
                 }
                 
-                // By Gender
+                // Gender Table
                 if (statistics.byGender != null && !statistics.byGender.isEmpty()) {
-                    contentStream.setFont(fontBold, 12);
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(margin, yPosition);
-                    contentStream.showText("Students by Gender");
-                    contentStream.endText();
-                    
+                    yPosition = drawTablePDF(contentStream, fontBold, font, tableStartX, yPosition, tableWidth, col1Width, col2Width, rowHeight,
+                        "STUDENTS BY GENDER",
+                        statistics.byGender.entrySet().stream()
+                            .sorted(Map.Entry.comparingByKey())
+                            .map(e -> new String[]{e.getKey(), String.valueOf(e.getValue())})
+                            .collect(java.util.stream.Collectors.toList()));
                     yPosition -= 20;
-                    contentStream.setFont(font, 10);
-                    for (Map.Entry<String, Long> entry : statistics.byGender.entrySet()) {
-                        contentStream.beginText();
-                        contentStream.newLineAtOffset(margin + 20, yPosition);
-                        contentStream.showText(entry.getKey() + ": " + entry.getValue());
-                        contentStream.endText();
-                        yPosition -= 15;
-                    }
                 }
+                
+                // Section Table
+                if (statistics.bySection != null && !statistics.bySection.isEmpty()) {
+                    // Check if we need a new page
+                    int sectionCount = statistics.bySection.size();
+                    float estimatedHeight = 50 + (sectionCount * rowHeight);
+                    if (yPosition - estimatedHeight < margin) {
+                        // Close current content stream properly
+                        contentStream.close();
+                        // Create new page
+                        page = new PDPage(new PDRectangle(PDRectangle.A4.getHeight(), PDRectangle.A4.getWidth()));
+                        document.addPage(page);
+                        contentStream = new PDPageContentStream(document, page);
+                        yPosition = pageHeight - margin;
+                    }
+                    
+                    yPosition = drawTablePDF(contentStream, fontBold, font, tableStartX, yPosition, tableWidth, col1Width, col2Width, rowHeight,
+                        "STUDENTS BY SECTION",
+                        statistics.bySection.entrySet().stream()
+                            .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                            .map(e -> new String[]{e.getKey(), String.valueOf(e.getValue())})
+                            .collect(java.util.stream.Collectors.toList()));
+                }
+                
+            } finally {
+                contentStream.close();
             }
             
             document.save(file);
         }
     }
     
+    private float drawTablePDF(PDPageContentStream contentStream, PDType1Font fontBold, PDType1Font font,
+                               float startX, float startY, float tableWidth, float col1Width, float col2Width, 
+                               float rowHeight, String header, List<String[]> data) throws IOException {
+        float cellPadding = 8;
+        float yPos = startY;
+        float headerHeight = rowHeight;
+        
+        // Draw table header with two columns
+        contentStream.setNonStrokingColor(0.1f, 0.2f, 0.3f); // Dark blue-gray like Excel
+        contentStream.addRect(startX, yPos - headerHeight, col1Width, headerHeight);
+        contentStream.fill();
+        contentStream.addRect(startX + col1Width, yPos - headerHeight, col2Width, headerHeight);
+        contentStream.fill();
+        
+        // Draw header borders
+        contentStream.setStrokingColor(0.0f, 0.0f, 0.0f);
+        contentStream.setLineWidth(1.0f);
+        // Top border
+        contentStream.moveTo(startX, yPos);
+        contentStream.lineTo(startX + tableWidth, yPos);
+        contentStream.stroke();
+        // Bottom border
+        contentStream.moveTo(startX, yPos - headerHeight);
+        contentStream.lineTo(startX + tableWidth, yPos - headerHeight);
+        contentStream.stroke();
+        // Vertical border between columns
+        contentStream.moveTo(startX + col1Width, yPos);
+        contentStream.lineTo(startX + col1Width, yPos - headerHeight);
+        contentStream.stroke();
+        // Left border
+        contentStream.moveTo(startX, yPos);
+        contentStream.lineTo(startX, yPos - headerHeight);
+        contentStream.stroke();
+        // Right border
+        contentStream.moveTo(startX + tableWidth, yPos);
+        contentStream.lineTo(startX + tableWidth, yPos - headerHeight);
+        contentStream.stroke();
+        
+        // Header text - Column 1
+        contentStream.setNonStrokingColor(1f, 1f, 1f); // White text
+        contentStream.beginText();
+        contentStream.setFont(fontBold, 11);
+        contentStream.newLineAtOffset(startX + cellPadding, yPos - headerHeight + 7);
+        contentStream.showText(header);
+        contentStream.endText();
+        
+        // Header text - Column 2
+        contentStream.beginText();
+        contentStream.setFont(fontBold, 11);
+        contentStream.newLineAtOffset(startX + col1Width + cellPadding, yPos - headerHeight + 7);
+        contentStream.showText("COUNT");
+        contentStream.endText();
+        
+        yPos -= headerHeight;
+        
+        // Draw data rows
+        boolean alternate = false;
+        for (String[] row : data) {
+            // Fill background
+            if (alternate) {
+                contentStream.setNonStrokingColor(0.95f, 0.95f, 0.95f); // Light gray
+            } else {
+                contentStream.setNonStrokingColor(1f, 1f, 1f); // White
+            }
+            contentStream.addRect(startX, yPos - rowHeight, col1Width, rowHeight);
+            contentStream.fill();
+            contentStream.addRect(startX + col1Width, yPos - rowHeight, col2Width, rowHeight);
+            contentStream.fill();
+            
+            // Draw borders for this row
+            contentStream.setStrokingColor(0.7f, 0.7f, 0.7f);
+            contentStream.setLineWidth(0.5f);
+            // Top border
+            contentStream.moveTo(startX, yPos);
+            contentStream.lineTo(startX + tableWidth, yPos);
+            contentStream.stroke();
+            // Bottom border
+            contentStream.moveTo(startX, yPos - rowHeight);
+            contentStream.lineTo(startX + tableWidth, yPos - rowHeight);
+            contentStream.stroke();
+            // Vertical border between columns
+            contentStream.moveTo(startX + col1Width, yPos);
+            contentStream.lineTo(startX + col1Width, yPos - rowHeight);
+            contentStream.stroke();
+            // Left border
+            contentStream.moveTo(startX, yPos);
+            contentStream.lineTo(startX, yPos - rowHeight);
+            contentStream.stroke();
+            // Right border
+            contentStream.moveTo(startX + tableWidth, yPos);
+            contentStream.lineTo(startX + tableWidth, yPos - rowHeight);
+            contentStream.stroke();
+            
+            // Draw text
+            contentStream.setNonStrokingColor(0f, 0f, 0f); // Black text
+            // Column 1 text
+            contentStream.beginText();
+            contentStream.setFont(font, 10);
+            contentStream.newLineAtOffset(startX + cellPadding, yPos - rowHeight + 7);
+            String text1 = row[0];
+            if (text1.length() > 50) {
+                text1 = text1.substring(0, 47) + "...";
+            }
+            contentStream.showText(text1);
+            contentStream.endText();
+            
+            // Column 2 text (right-aligned like Excel)
+            contentStream.beginText();
+            contentStream.setFont(fontBold, 10);
+            // Approximate text width: ~6 pixels per character for font size 10
+            float textWidth = row[1].length() * 6f;
+            float rightAlignX = startX + col1Width + col2Width - cellPadding - textWidth;
+            contentStream.newLineAtOffset(Math.max(startX + col1Width + cellPadding, rightAlignX), yPos - rowHeight + 7);
+            contentStream.showText(row[1]);
+            contentStream.endText();
+            
+            yPos -= rowHeight;
+            alternate = !alternate;
+        }
+        
+        return yPos;
+    }
+    
     private void generateExcel(File file) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Enrollment Summary");
             
-            // Create header style
+            // Set print orientation to landscape
+            org.apache.poi.ss.usermodel.PrintSetup printSetup = sheet.getPrintSetup();
+            printSetup.setLandscape(true);
+            printSetup.setFitWidth((short) 1);
+            printSetup.setFitHeight((short) 0);
+            
+            // Create styles
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 16);
+            titleStyle.setFont(titleFont);
+            titleStyle.setAlignment(HorizontalAlignment.CENTER);
+            
             CellStyle headerStyle = workbook.createCellStyle();
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);
             headerFont.setFontHeightInPoints((short) 11);
+            headerFont.setColor(IndexedColors.WHITE.getIndex());
             headerStyle.setFont(headerFont);
-            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
             headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
+            
+            CellStyle dataStyle = workbook.createCellStyle();
+            dataStyle.setBorderBottom(BorderStyle.THIN);
+            dataStyle.setBorderTop(BorderStyle.THIN);
+            dataStyle.setBorderLeft(BorderStyle.THIN);
+            dataStyle.setBorderRight(BorderStyle.THIN);
+            dataStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            
+            CellStyle alternateStyle = workbook.createCellStyle();
+            alternateStyle.cloneStyleFrom(dataStyle);
+            alternateStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            alternateStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            
+            CellStyle numberStyle = workbook.createCellStyle();
+            numberStyle.cloneStyleFrom(dataStyle);
+            numberStyle.setAlignment(HorizontalAlignment.RIGHT);
+            
+            CellStyle numberAlternateStyle = workbook.createCellStyle();
+            numberAlternateStyle.cloneStyleFrom(alternateStyle);
+            numberAlternateStyle.setAlignment(HorizontalAlignment.RIGHT);
             
             int rowNum = 0;
             
             // Title
             Row titleRow = sheet.createRow(rowNum++);
             Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("ENROLLMENT SUMMARY / STATISTICS");
-            CellStyle titleStyle = workbook.createCellStyle();
-            Font titleFont = workbook.createFont();
-            titleFont.setBold(true);
-            titleFont.setFontHeightInPoints((short) 14);
-            titleStyle.setFont(titleFont);
+            titleCell.setCellValue("ENROLLMENT SUMMARY REPORT");
             titleCell.setCellStyle(titleStyle);
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(rowNum - 1, rowNum - 1, 0, 1));
             
             // Date
             Row dateRow = sheet.createRow(rowNum++);
-            dateRow.createCell(0).setCellValue("Generated: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM dd, yyyy")));
+            Cell dateCell = dateRow.createCell(0);
+            dateCell.setCellValue("Generated: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM dd, yyyy")));
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(rowNum - 1, rowNum - 1, 0, 1));
             
             rowNum++; // Empty row
             
-            // Summary
+            // Summary Table
             Row summaryHeader = sheet.createRow(rowNum++);
-            summaryHeader.createCell(0).setCellValue("Summary");
-            summaryHeader.getCell(0).setCellStyle(headerStyle);
+            Cell sumHeader1 = summaryHeader.createCell(0);
+            sumHeader1.setCellValue("SUMMARY");
+            sumHeader1.setCellStyle(headerStyle);
+            Cell sumHeader2 = summaryHeader.createCell(1);
+            sumHeader2.setCellValue("");
+            sumHeader2.setCellStyle(headerStyle);
             
             Row enrolledRow = sheet.createRow(rowNum++);
-            enrolledRow.createCell(0).setCellValue("Total Enrolled");
-            enrolledRow.createCell(1).setCellValue(statistics.totalEnrolled);
+            Cell enrolledLabel = enrolledRow.createCell(0);
+            enrolledLabel.setCellValue("Total Enrolled");
+            enrolledLabel.setCellStyle(dataStyle);
+            Cell enrolledValue = enrolledRow.createCell(1);
+            enrolledValue.setCellValue(statistics.totalEnrolled);
+            enrolledValue.setCellStyle(numberStyle);
             
             Row pendingRow = sheet.createRow(rowNum++);
-            pendingRow.createCell(0).setCellValue("Pending Applications");
-            pendingRow.createCell(1).setCellValue(statistics.totalPending);
+            Cell pendingLabel = pendingRow.createCell(0);
+            pendingLabel.setCellValue("Pending Applications");
+            pendingLabel.setCellStyle(alternateStyle);
+            Cell pendingValue = pendingRow.createCell(1);
+            pendingValue.setCellValue(statistics.totalPending);
+            pendingValue.setCellStyle(numberAlternateStyle);
             
             rowNum++; // Empty row
             
-            // By Grade Level
+            // Grade Level Table
             if (statistics.byGradeLevel != null && !statistics.byGradeLevel.isEmpty()) {
-                Row gradeHeader = sheet.createRow(rowNum++);
-                gradeHeader.createCell(0).setCellValue("Students by Grade Level");
-                gradeHeader.getCell(0).setCellStyle(headerStyle);
-                
-                for (Map.Entry<Integer, Long> entry : statistics.byGradeLevel.entrySet()) {
-                    Row row = sheet.createRow(rowNum++);
-                    row.createCell(0).setCellValue("Grade " + entry.getKey());
-                    row.createCell(1).setCellValue(entry.getValue());
-                }
-                rowNum++; // Empty row
+                rowNum = createTableSection(sheet, rowNum, "STUDENTS BY GRADE LEVEL",
+                    statistics.byGradeLevel.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(e -> new Object[]{"Grade " + e.getKey(), e.getValue()})
+                        .collect(java.util.stream.Collectors.toList()),
+                    headerStyle, dataStyle, alternateStyle, numberStyle, numberAlternateStyle);
+                rowNum++;
             }
             
-            // By Strand
+            // Strand Table
             if (statistics.byStrand != null && !statistics.byStrand.isEmpty()) {
-                Row strandHeader = sheet.createRow(rowNum++);
-                strandHeader.createCell(0).setCellValue("Students by Strand");
-                strandHeader.getCell(0).setCellStyle(headerStyle);
-                
-                for (Map.Entry<String, Long> entry : statistics.byStrand.entrySet()) {
-                    Row row = sheet.createRow(rowNum++);
-                    row.createCell(0).setCellValue(entry.getKey());
-                    row.createCell(1).setCellValue(entry.getValue());
-                }
-                rowNum++; // Empty row
+                rowNum = createTableSection(sheet, rowNum, "STUDENTS BY STRAND",
+                    statistics.byStrand.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(e -> new Object[]{e.getKey(), e.getValue()})
+                        .collect(java.util.stream.Collectors.toList()),
+                    headerStyle, dataStyle, alternateStyle, numberStyle, numberAlternateStyle);
+                rowNum++;
             }
             
-            // By Gender
+            // Gender Table
             if (statistics.byGender != null && !statistics.byGender.isEmpty()) {
-                Row genderHeader = sheet.createRow(rowNum++);
-                genderHeader.createCell(0).setCellValue("Students by Gender");
-                genderHeader.getCell(0).setCellStyle(headerStyle);
-                
-                for (Map.Entry<String, Long> entry : statistics.byGender.entrySet()) {
-                    Row row = sheet.createRow(rowNum++);
-                    row.createCell(0).setCellValue(entry.getKey());
-                    row.createCell(1).setCellValue(entry.getValue());
-                }
+                rowNum = createTableSection(sheet, rowNum, "STUDENTS BY GENDER",
+                    statistics.byGender.entrySet().stream()
+                        .sorted(Map.Entry.comparingByKey())
+                        .map(e -> new Object[]{e.getKey(), e.getValue()})
+                        .collect(java.util.stream.Collectors.toList()),
+                    headerStyle, dataStyle, alternateStyle, numberStyle, numberAlternateStyle);
+                rowNum++;
+            }
+            
+            // Section Table
+            if (statistics.bySection != null && !statistics.bySection.isEmpty()) {
+                rowNum = createTableSection(sheet, rowNum, "STUDENTS BY SECTION",
+                    statistics.bySection.entrySet().stream()
+                        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                        .map(e -> new Object[]{e.getKey(), e.getValue()})
+                        .collect(java.util.stream.Collectors.toList()),
+                    headerStyle, dataStyle, alternateStyle, numberStyle, numberAlternateStyle);
             }
             
             // Auto-size columns
-            sheet.autoSizeColumn(0);
-            sheet.autoSizeColumn(1);
+            sheet.setColumnWidth(0, 15000); // ~150px
+            sheet.setColumnWidth(1, 5000);  // ~50px
             
             try (FileOutputStream outputStream = new FileOutputStream(file)) {
                 workbook.write(outputStream);
             }
         }
+    }
+    
+    private int createTableSection(Sheet sheet, int startRow, String header, List<Object[]> data,
+                                   CellStyle headerStyle, CellStyle dataStyle, CellStyle alternateStyle,
+                                   CellStyle numberStyle, CellStyle numberAlternateStyle) {
+        int rowNum = startRow;
+        
+        // Header row
+        Row headerRow = sheet.createRow(rowNum++);
+        Cell headerCell1 = headerRow.createCell(0);
+        headerCell1.setCellValue(header);
+        headerCell1.setCellStyle(headerStyle);
+        Cell headerCell2 = headerRow.createCell(1);
+        headerCell2.setCellValue("COUNT");
+        headerCell2.setCellStyle(headerStyle);
+        
+        // Data rows
+        boolean alternate = false;
+        for (Object[] row : data) {
+            Row dataRow = sheet.createRow(rowNum++);
+            Cell cell1 = dataRow.createCell(0);
+            cell1.setCellValue(row[0].toString());
+            cell1.setCellStyle(alternate ? alternateStyle : dataStyle);
+            
+            Cell cell2 = dataRow.createCell(1);
+            if (row[1] instanceof Number) {
+                cell2.setCellValue(((Number) row[1]).doubleValue());
+            } else {
+                cell2.setCellValue(row[1].toString());
+            }
+            cell2.setCellStyle(alternate ? numberAlternateStyle : numberStyle);
+            alternate = !alternate;
+        }
+        
+        return rowNum;
     }
 }
 

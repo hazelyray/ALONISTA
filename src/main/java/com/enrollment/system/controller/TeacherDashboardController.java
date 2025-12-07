@@ -25,6 +25,7 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TextField;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -55,6 +56,21 @@ import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.util.Duration;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogPane;
+import javafx.scene.control.ButtonType;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.io.FileOutputStream;
 
 @Component
 public class TeacherDashboardController {
@@ -1144,10 +1160,17 @@ public class TeacherDashboardController {
         }
     }
     
+    private Section currentSectionForExport = null;
+    private List<StudentDto> currentSectionStudents = null;
+    
     private void showSectionStudents(Section section, List<StudentDto> students) {
         dashboardContent.getChildren().clear();
         
-        // Back button and title
+        // Store for export functionality
+        currentSectionForExport = section;
+        currentSectionStudents = students;
+        
+        // Back button and title with export buttons
         HBox headerBox = new HBox(15);
         headerBox.setAlignment(Pos.CENTER_LEFT);
         headerBox.setPadding(new Insets(0, 0, 25, 0));
@@ -1166,7 +1189,38 @@ public class TeacherDashboardController {
         Label pageTitle = new Label(section.getName() + " - Students");
         pageTitle.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         
-        headerBox.getChildren().addAll(backButton, pageTitle);
+        // Export buttons (upper-right corner)
+        HBox exportButtonsBox = new HBox(10);
+        exportButtonsBox.setAlignment(Pos.CENTER_RIGHT);
+        
+        Button exportPdfButton = new Button("📄 Export PDF");
+        exportPdfButton.setStyle(
+            "-fx-background-color: #e74c3c; " +
+            "-fx-text-fill: white; " +
+            "-fx-font-size: 13px; " +
+            "-fx-padding: 10 20; " +
+            "-fx-background-radius: 5; " +
+            "-fx-cursor: hand;"
+        );
+        exportPdfButton.setOnAction(e -> exportToPDF(section, students));
+        
+        Button exportExcelButton = new Button("📊 Export Excel");
+        exportExcelButton.setStyle(
+            "-fx-background-color: #27ae60; " +
+            "-fx-text-fill: white; " +
+            "-fx-font-size: 13px; " +
+            "-fx-padding: 10 20; " +
+            "-fx-background-radius: 5; " +
+            "-fx-cursor: hand;"
+        );
+        exportExcelButton.setOnAction(e -> exportToExcel(section, students));
+        
+        exportButtonsBox.getChildren().addAll(exportPdfButton, exportExcelButton);
+        
+        // Header with title on left, export buttons on right
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        headerBox.getChildren().addAll(backButton, pageTitle, spacer, exportButtonsBox);
         dashboardContent.getChildren().add(headerBox);
         
         if (students.isEmpty()) {
@@ -1183,10 +1237,533 @@ public class TeacherDashboardController {
             emptyBox.getChildren().addAll(emptyIcon, noStudentsLabel);
             dashboardContent.getChildren().add(emptyBox);
         } else {
-            TableView<StudentDto> studentsTable = createStudentsTable(students);
+            TableView<StudentDto> studentsTable = createStudentsTable(students, section);
             studentsTable.setPrefHeight(600);
             dashboardContent.getChildren().add(studentsTable);
         }
+    }
+    
+    private void exportToPDF(Section section, List<StudentDto> students) {
+        if (section == null || students == null || students.isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("No Data");
+            alert.setHeaderText("No students found in this section");
+            alert.showAndWait();
+            return;
+        }
+        
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save PDF Report");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+        fileChooser.setInitialFileName("Student_List_" + section.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".pdf");
+        
+        Stage stage = (Stage) dashboardContent.getScene().getWindow();
+        File file = fileChooser.showSaveDialog(stage);
+        
+        if (file != null) {
+            new Thread(() -> {
+                try {
+                    generatePDF(file, section, students);
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                        alert.setTitle("Success");
+                        alert.setHeaderText("PDF exported successfully");
+                        alert.setContentText("File saved to: " + file.getAbsolutePath());
+                        alert.showAndWait();
+                    });
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Error");
+                        alert.setHeaderText("Failed to export PDF");
+                        alert.setContentText("Error: " + e.getMessage());
+                        alert.showAndWait();
+                    });
+                }
+            }).start();
+        }
+    }
+    
+    private void exportToExcel(Section section, List<StudentDto> students) {
+        if (section == null || students == null || students.isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("No Data");
+            alert.setHeaderText("No students found in this section");
+            alert.showAndWait();
+            return;
+        }
+        
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save Excel Report");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Excel Files", "*.xlsx"));
+        fileChooser.setInitialFileName("Student_List_" + section.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".xlsx");
+        
+        Stage stage = (Stage) dashboardContent.getScene().getWindow();
+        File file = fileChooser.showSaveDialog(stage);
+        
+        if (file != null) {
+            new Thread(() -> {
+                try {
+                    generateExcel(file, section, students);
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                        alert.setTitle("Success");
+                        alert.setHeaderText("Excel exported successfully");
+                        alert.setContentText("File saved to: " + file.getAbsolutePath());
+                        alert.showAndWait();
+                    });
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Error");
+                        alert.setHeaderText("Failed to export Excel");
+                        alert.setContentText("Error: " + e.getMessage());
+                        alert.showAndWait();
+                    });
+                }
+            }).start();
+        }
+    }
+    
+    private void generatePDF(File file, Section section, List<StudentDto> students) throws IOException {
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage(new PDRectangle(842, 595));
+            document.addPage(page);
+            
+            PDPageContentStream contentStream = new PDPageContentStream(document, page);
+            try {
+                PDType1Font fontBold = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
+                PDType1Font font = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA);
+                
+                float margin = 35;
+                float pageWidth = 842;
+                float pageHeight = 595;
+                float yPosition = pageHeight - margin;
+                float lineHeight = 12;
+                float headerLineHeight = 14;
+                
+                // Title Section
+                contentStream.beginText();
+                contentStream.setFont(fontBold, 18);
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText("STUDENT LIST BY SECTION");
+                contentStream.endText();
+                
+                yPosition -= 25;
+                
+                // Section Info
+                contentStream.beginText();
+                contentStream.setFont(font, 11);
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText("Section: " + section.getName() + " | Strand: " + section.getStrand() + " | Grade Level: " + section.getGradeLevel());
+                contentStream.endText();
+                
+                yPosition -= 18;
+                
+                // Date
+                contentStream.beginText();
+                contentStream.setFont(font, 9);
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText("Generated: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM dd, yyyy")));
+                contentStream.endText();
+                
+                yPosition -= 25;
+                
+                // Draw separator line
+                contentStream.setLineWidth(0.5f);
+                contentStream.moveTo(margin, yPosition);
+                contentStream.lineTo(pageWidth - margin, yPosition);
+                contentStream.stroke();
+                
+                yPosition -= 15;
+                
+                // Table headers - only required fields
+                float[] columnWidths = {130, 80, 35, 100, 120, 150, 85}; // Name, Contact, Sex, Grade, Strand, Section, LRN
+                String[] headers = {"Name", "Contact Number", "Sex", "Grade Level", "Strand", "Section", "LRN"};
+                
+                float totalWidth = 0;
+                for (float width : columnWidths) {
+                    totalWidth += width;
+                }
+                
+                // Header row
+                float headerY = yPosition;
+                contentStream.setNonStrokingColor(0.9f, 0.9f, 0.9f);
+                contentStream.addRect(margin, headerY - headerLineHeight, totalWidth, headerLineHeight);
+                contentStream.fill();
+                contentStream.setNonStrokingColor(0, 0, 0);
+                
+                // Header text
+                float xPosition = margin;
+                contentStream.setFont(fontBold, 9);
+                for (int i = 0; i < headers.length; i++) {
+                    contentStream.beginText();
+                    contentStream.newLineAtOffset(xPosition + 2, headerY - 10);
+                    contentStream.showText(headers[i]);
+                    contentStream.endText();
+                    xPosition += columnWidths[i];
+                }
+                
+                yPosition -= headerLineHeight;
+                
+                // Draw header bottom line
+                contentStream.setLineWidth(0.5f);
+                contentStream.setStrokingColor(0.3f, 0.3f, 0.3f);
+                contentStream.moveTo(margin, yPosition);
+                contentStream.lineTo(margin + totalWidth, yPosition);
+                contentStream.stroke();
+                contentStream.setStrokingColor(0, 0, 0);
+                
+                yPosition -= 8;
+                
+                // Student data rows
+                contentStream.setFont(font, 8);
+                int rowNumber = 0;
+                for (StudentDto student : students) {
+                    if (yPosition < 60) {
+                        contentStream.close();
+                        page = new PDPage(new PDRectangle(842, 595));
+                        document.addPage(page);
+                        contentStream = new PDPageContentStream(document, page);
+                        fontBold = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
+                        font = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA);
+                        yPosition = pageHeight - margin;
+                        
+                        headerY = yPosition;
+                        contentStream.setNonStrokingColor(0.9f, 0.9f, 0.9f);
+                        contentStream.addRect(margin, headerY - headerLineHeight, totalWidth, headerLineHeight);
+                        contentStream.fill();
+                        contentStream.setNonStrokingColor(0, 0, 0);
+                        
+                        xPosition = margin;
+                        contentStream.setFont(fontBold, 9);
+                        for (int i = 0; i < headers.length; i++) {
+                            contentStream.beginText();
+                            contentStream.newLineAtOffset(xPosition + 2, headerY - 10);
+                            contentStream.showText(headers[i]);
+                            contentStream.endText();
+                            xPosition += columnWidths[i];
+                        }
+                        
+                        contentStream.setLineWidth(0.5f);
+                        contentStream.setStrokingColor(0.3f, 0.3f, 0.3f);
+                        contentStream.moveTo(margin, headerY - headerLineHeight);
+                        contentStream.lineTo(margin + totalWidth, headerY - headerLineHeight);
+                        contentStream.stroke();
+                        contentStream.setStrokingColor(0, 0, 0);
+                        
+                        yPosition = headerY - headerLineHeight - 8;
+                        contentStream.setFont(font, 8);
+                    }
+                    
+                    if (rowNumber % 2 == 0) {
+                        contentStream.setNonStrokingColor(0.98f, 0.98f, 0.98f);
+                        contentStream.addRect(margin, yPosition - lineHeight, totalWidth, lineHeight);
+                        contentStream.fill();
+                        contentStream.setNonStrokingColor(0, 0, 0);
+                    }
+                    
+                    xPosition = margin;
+                    String[] rowData = {
+                        student.getName() != null ? student.getName() : "",
+                        student.getContactNumber() != null ? student.getContactNumber() : "",
+                        student.getSex() != null ? student.getSex() : "",
+                        student.getGradeLevel() != null ? String.valueOf(student.getGradeLevel()) : "",
+                        student.getStrand() != null ? student.getStrand() : "",
+                        student.getSectionName() != null ? student.getSectionName() : "",
+                        student.getLrn() != null ? student.getLrn() : ""
+                    };
+                    
+                    for (int i = 0; i < rowData.length; i++) {
+                        String text = rowData[i];
+                        contentStream.beginText();
+                        contentStream.newLineAtOffset(xPosition + 2, yPosition - 9);
+                        contentStream.showText(text);
+                        contentStream.endText();
+                        xPosition += columnWidths[i];
+                    }
+                    
+                    yPosition -= lineHeight;
+                    rowNumber++;
+                }
+                
+                // Footer
+                yPosition -= 15;
+                contentStream.setLineWidth(0.5f);
+                contentStream.moveTo(margin, yPosition);
+                contentStream.lineTo(pageWidth - margin, yPosition);
+                contentStream.stroke();
+                
+                yPosition -= 12;
+                contentStream.beginText();
+                contentStream.setFont(fontBold, 10);
+                contentStream.newLineAtOffset(margin, yPosition);
+                contentStream.showText("Total Students: " + students.size());
+                contentStream.endText();
+                
+            } finally {
+                if (contentStream != null) {
+                    contentStream.close();
+                }
+            }
+            
+            document.save(file);
+        }
+    }
+    
+    private void generateExcel(File file, Section section, List<StudentDto> students) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Student List");
+            
+            // Create header style
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setFontHeightInPoints((short) 11);
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
+            
+            // Create data style
+            CellStyle dataStyle = workbook.createCellStyle();
+            dataStyle.setBorderBottom(BorderStyle.THIN);
+            dataStyle.setBorderTop(BorderStyle.THIN);
+            dataStyle.setBorderLeft(BorderStyle.THIN);
+            dataStyle.setBorderRight(BorderStyle.THIN);
+            
+            int rowNum = 0;
+            
+            // Title row
+            Row titleRow = sheet.createRow(rowNum++);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("STUDENT LIST BY SECTION");
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 14);
+            titleStyle.setFont(titleFont);
+            titleCell.setCellStyle(titleStyle);
+            
+            // Section info row
+            Row infoRow = sheet.createRow(rowNum++);
+            infoRow.createCell(0).setCellValue("Section: " + section.getName() + " | Strand: " + section.getStrand() + " | Grade: " + section.getGradeLevel());
+            
+            // Date row
+            Row dateRow = sheet.createRow(rowNum++);
+            dateRow.createCell(0).setCellValue("Generated: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM dd, yyyy")));
+            
+            rowNum++; // Empty row
+            
+            // Header row - only required fields
+            Row headerRow = sheet.createRow(rowNum++);
+            String[] headers = {"Name", "Contact Number", "Sex", "Grade Level", "Strand", "Section", "LRN"};
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+            
+            // Data rows
+            for (StudentDto student : students) {
+                Row row = sheet.createRow(rowNum++);
+                int colNum = 0;
+                
+                row.createCell(colNum++).setCellValue(student.getName() != null ? student.getName() : "");
+                row.createCell(colNum++).setCellValue(student.getContactNumber() != null ? student.getContactNumber() : "");
+                row.createCell(colNum++).setCellValue(student.getSex() != null ? student.getSex() : "");
+                row.createCell(colNum++).setCellValue(student.getGradeLevel() != null ? student.getGradeLevel() : 0);
+                row.createCell(colNum++).setCellValue(student.getStrand() != null ? student.getStrand() : "");
+                row.createCell(colNum++).setCellValue(student.getSectionName() != null ? student.getSectionName() : "");
+                row.createCell(colNum++).setCellValue(student.getLrn() != null ? student.getLrn() : "");
+                
+                // Apply data style
+                for (int i = 0; i < colNum; i++) {
+                    row.getCell(i).setCellStyle(dataStyle);
+                }
+            }
+            
+            // Auto-size columns
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            
+            // Footer row
+            rowNum++;
+            Row footerRow = sheet.createRow(rowNum);
+            footerRow.createCell(0).setCellValue("Total Students: " + students.size());
+            
+            try (FileOutputStream outputStream = new FileOutputStream(file)) {
+                workbook.write(outputStream);
+            }
+        }
+    }
+    
+    private void showEditStudentModal(StudentDto student, Section section, TableView<StudentDto> table, List<StudentDto> studentsList) {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Edit Student");
+        dialog.setHeaderText("Edit Student Information");
+        
+        DialogPane dialogPane = dialog.getDialogPane();
+        dialogPane.getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialogPane.setStyle("-fx-background-color: white;");
+        
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+        content.setPrefWidth(500);
+        
+        // Name Field
+        VBox nameBox = new VBox(5);
+        Label nameLabel = new Label("Name *");
+        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        TextField nameField = new TextField(student.getName());
+        nameField.setStyle("-fx-font-size: 14px; -fx-padding: 8; -fx-background-radius: 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5;");
+        nameBox.getChildren().addAll(nameLabel, nameField);
+        
+        // Contact Number Field
+        VBox contactBox = new VBox(5);
+        Label contactLabel = new Label("Contact Number");
+        contactLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        TextField contactField = new TextField(student.getContactNumber());
+        contactField.setStyle("-fx-font-size: 14px; -fx-padding: 8; -fx-background-radius: 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5;");
+        contactBox.getChildren().addAll(contactLabel, contactField);
+        
+        // Sex Field
+        VBox sexBox = new VBox(5);
+        Label sexLabel = new Label("Sex *");
+        sexLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        ComboBox<String> sexComboBox = new ComboBox<>();
+        sexComboBox.getItems().addAll("Male", "Female");
+        sexComboBox.setValue(student.getSex());
+        sexComboBox.setStyle("-fx-font-size: 14px; -fx-padding: 8; -fx-background-radius: 5;");
+        sexComboBox.setPrefWidth(200);
+        sexBox.getChildren().addAll(sexLabel, sexComboBox);
+        
+        // LRN Field
+        VBox lrnBox = new VBox(5);
+        Label lrnLabel = new Label("LRN");
+        lrnLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        TextField lrnField = new TextField(student.getLrn());
+        lrnField.setStyle("-fx-font-size: 14px; -fx-padding: 8; -fx-background-radius: 5; -fx-border-color: #bdc3c7; -fx-border-radius: 5;");
+        lrnBox.getChildren().addAll(lrnLabel, lrnField);
+        
+        // Readonly fields (Grade Level, Strand, Section)
+        VBox readonlyBox = new VBox(10);
+        readonlyBox.setStyle("-fx-background-color: #ecf0f1; -fx-padding: 15; -fx-background-radius: 5;");
+        
+        Label readonlyTitle = new Label("Read-only Information");
+        readonlyTitle.setStyle("-fx-font-size: 12px; -fx-font-weight: bold; -fx-text-fill: #7f8c8d;");
+        
+        HBox gradeBox = new HBox(10);
+        Label gradeLabel = new Label("Grade Level:");
+        gradeLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #34495e;");
+        Label gradeValue = new Label(student.getGradeLevel() != null ? String.valueOf(student.getGradeLevel()) : "N/A");
+        gradeValue.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        gradeBox.getChildren().addAll(gradeLabel, gradeValue);
+        
+        HBox strandBox = new HBox(10);
+        Label strandLabel = new Label("Strand:");
+        strandLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #34495e;");
+        Label strandValue = new Label(student.getStrand() != null ? student.getStrand() : "N/A");
+        strandValue.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        strandBox.getChildren().addAll(strandLabel, strandValue);
+        
+        HBox sectionBox = new HBox(10);
+        Label sectionLabel = new Label("Section:");
+        sectionLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #34495e;");
+        Label sectionValue = new Label(section.getName());
+        sectionValue.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        sectionBox.getChildren().addAll(sectionLabel, sectionValue);
+        
+        readonlyBox.getChildren().addAll(readonlyTitle, gradeBox, strandBox, sectionBox);
+        
+        content.getChildren().addAll(nameBox, contactBox, sexBox, lrnBox, readonlyBox);
+        dialogPane.setContent(content);
+        
+        // Customize OK button
+        Button okButton = (Button) dialogPane.lookupButton(ButtonType.OK);
+        okButton.setText("Save");
+        okButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-background-radius: 5;");
+        
+        // Handle save
+        dialog.setResultConverter(buttonType -> {
+            if (buttonType == ButtonType.OK) {
+                // Validate
+                if (nameField.getText().trim().isEmpty()) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Validation Error");
+                    alert.setHeaderText("Name is required");
+                    alert.setContentText("Please enter a student name.");
+                    alert.showAndWait();
+                    return null;
+                }
+                
+                if (sexComboBox.getValue() == null || sexComboBox.getValue().isEmpty()) {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Validation Error");
+                    alert.setHeaderText("Sex is required");
+                    alert.setContentText("Please select a sex.");
+                    alert.showAndWait();
+                    return null;
+                }
+                
+                // Update student
+                okButton.setDisable(true);
+                okButton.setText("Saving...");
+                
+                new Thread(() -> {
+                    try {
+                        StudentDto updatedStudent = studentService.updateStudentForTeacher(
+                            student.getId(),
+                            nameField.getText().trim(),
+                            contactField.getText().trim(),
+                            sexComboBox.getValue(),
+                            lrnField.getText().trim()
+                        );
+                        
+                        Platform.runLater(() -> {
+                            // Update the student in the list
+                            int index = studentsList.indexOf(student);
+                            if (index >= 0) {
+                                studentsList.set(index, updatedStudent);
+                                table.refresh();
+                            }
+                            
+                            dialog.close();
+                            
+                            // Show success toast
+                            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                            alert.setTitle("Success");
+                            alert.setHeaderText("Student updated successfully");
+                            alert.setContentText("Student information has been updated.");
+                            alert.showAndWait();
+                        });
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Platform.runLater(() -> {
+                            okButton.setDisable(false);
+                            okButton.setText("Save");
+                            
+                            Alert alert = new Alert(Alert.AlertType.ERROR);
+                            alert.setTitle("Error");
+                            alert.setHeaderText("Failed to update student");
+                            alert.setContentText("Error: " + e.getMessage());
+                            alert.showAndWait();
+                        });
+                    }
+                }).start();
+                
+                return ButtonType.OK;
+            }
+            return buttonType;
+        });
+        
+        dialog.showAndWait();
     }
     
     private void loadAccountSettingsPage() {
@@ -1532,7 +2109,7 @@ public class TeacherDashboardController {
         return card;
     }
     
-    private TableView<StudentDto> createStudentsTable(List<StudentDto> students) {
+    private TableView<StudentDto> createStudentsTable(List<StudentDto> students, Section section) {
         TableView<StudentDto> table = new TableView<>();
         table.setPrefHeight(400);
         table.setStyle(
@@ -1583,9 +2160,41 @@ public class TeacherDashboardController {
         contactCol.setPrefWidth(120);
         contactCol.setStyle("-fx-font-size: 13px;");
         
+        // Action Column with Edit button
+        TableColumn<StudentDto, Void> actionCol = new TableColumn<>("Action");
+        actionCol.setPrefWidth(100);
+        actionCol.setStyle("-fx-font-size: 13px;");
+        actionCol.setCellFactory(param -> new TableCell<StudentDto, Void>() {
+            private final Button editButton = new Button("✏️");
+            {
+                editButton.setStyle(
+                    "-fx-background-color: #3498db; " +
+                    "-fx-text-fill: white; " +
+                    "-fx-font-size: 12px; " +
+                    "-fx-padding: 5 10; " +
+                    "-fx-background-radius: 5; " +
+                    "-fx-cursor: hand;"
+                );
+                editButton.setOnAction(event -> {
+                    StudentDto student = getTableView().getItems().get(getIndex());
+                    showEditStudentModal(student, section, table, students);
+                });
+            }
+            
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(editButton);
+                }
+            }
+        });
+        
         @SuppressWarnings("unchecked")
         TableColumn<StudentDto, ?>[] columns = new TableColumn[] {
-            nameCol, lrnCol, gradeCol, strandCol, sectionCol, sexCol, contactCol
+            nameCol, lrnCol, gradeCol, strandCol, sectionCol, sexCol, contactCol, actionCol
         };
         table.getColumns().addAll(columns);
         

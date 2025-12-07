@@ -937,7 +937,7 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
             return;
         }
         
-        // Check if this exact assignment (same subject + same section) already exists
+        // Check if this exact assignment (same subject + same section) already exists for this teacher
         boolean exactAssignmentExists = assignments.stream()
             .anyMatch(a -> a.getSubject().getId().equals(selectedSubject.getId()) &&
                           a.getSection().getId().equals(selectedSection.getId()));
@@ -946,6 +946,24 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
             showError("This subject is already assigned to this section. " +
                      "You cannot assign the same subject to the same section twice.");
             return;
+        }
+        
+        // Check if this subject-section combination is already assigned to a different teacher
+        try {
+            java.util.Optional<com.enrollment.system.model.TeacherAssignment> conflictingAssignment = 
+                teacherService.findConflictingAssignment(selectedSubject.getId(), selectedSection.getId(), teacher.getId());
+            
+            if (conflictingAssignment.isPresent()) {
+                com.enrollment.system.model.TeacherAssignment conflict = conflictingAssignment.get();
+                String conflictingTeacherName = conflict.getTeacher() != null ? conflict.getTeacher().getFullName() : "Unknown Teacher";
+                showError("This subject and section is already assigned to a different teacher: " + conflictingTeacherName + 
+                         ".\n\nYou cannot assign the same subject-section combination to multiple teachers.");
+                return;
+            }
+        } catch (Exception e) {
+            // If check fails, log but don't block - allow the assignment to proceed
+            System.err.println("Warning: Could not check for conflicting assignments: " + e.getMessage());
+            e.printStackTrace();
         }
         
         // Check maximum 8 total assignments (subject-section pairs) before adding

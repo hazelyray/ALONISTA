@@ -30,17 +30,13 @@ public class SchemaFixListener {
             
             try {
                 // Check and fix the table schema
+                // NOTE: This will only fix if there are actual schema issues - won't drop table if schema is correct
                 databaseSchemaUpdater.ensureTeacherAssignmentsTableExists();
                 System.out.println("✅ Post-initialization schema check completed");
             } catch (Exception e) {
                 System.err.println("❌ Post-initialization schema fix failed: " + e.getMessage());
-                // Try force fix as last resort
-                try {
-                    System.out.println("🔄 Attempting force fix as last resort...");
-                    databaseSchemaUpdater.forceFixTeacherAssignmentsTable();
-                } catch (Exception e2) {
-                    System.err.println("❌ Force fix also failed: " + e2.getMessage());
-                }
+                // Do NOT force fix here - it will drop the table and delete all data!
+                // Force fix should only be used manually when schema is corrupted
             }
             
             // Also run comprehensive schema scanner

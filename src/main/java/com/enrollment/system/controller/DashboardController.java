@@ -633,8 +633,8 @@ public class DashboardController {
             Stage enrollmentSummaryStage = new Stage();
             enrollmentSummaryStage.setTitle("Enrollment Summary - Seguinon SHS Enrollment System");
             enrollmentSummaryStage.setScene(new Scene(enrollmentSummaryRoot));
-            enrollmentSummaryStage.setWidth(1200);
-            enrollmentSummaryStage.setHeight(800);
+            enrollmentSummaryStage.setWidth(1400);
+            enrollmentSummaryStage.setHeight(900);
             enrollmentSummaryStage.setResizable(true);
             
             // Set owner to dashboard stage

@@ -411,6 +411,75 @@ public class StudentService {
         return StudentDto.fromStudent(updatedStudent);
     }
     
+    /**
+     * Restricted update method for teachers - only allows updating:
+     * - Name
+     * - Contact Number
+     * - Sex
+     * - LRN
+     * 
+     * All other fields (Grade Level, Strand, Section) remain unchanged.
+     */
+    @Transactional
+    public StudentDto updateStudentForTeacher(Long id, String name, String contactNumber, String sex, String lrn) {
+        Student student = studentRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Student not found with id: " + id));
+        
+        // Validate and update name
+        String newName = name != null ? name.trim() : null;
+        String currentName = student.getName();
+        
+        if (newName != null && !newName.isEmpty()) {
+            // Check if name is being changed
+            if (!newName.equalsIgnoreCase(currentName != null ? currentName.trim() : "")) {
+                // Check if another student already has this name
+                if (studentRepository.existsByNameIgnoreCaseExcludingId(newName, id)) {
+                    throw new RuntimeException("A student with the name \"" + newName + "\" already exists. Student names must be unique.");
+                }
+            }
+            student.setName(newName);
+        } else {
+            throw new RuntimeException("Student name cannot be empty.");
+        }
+        
+        // Update contact number
+        student.setContactNumber(contactNumber != null ? contactNumber.trim() : null);
+        
+        // Update sex
+        if (sex != null && !sex.trim().isEmpty()) {
+            student.setSex(sex.trim());
+        } else {
+            throw new RuntimeException("Sex is required.");
+        }
+        
+        // Update LRN - check for uniqueness if LRN is being changed
+        String newLrn = lrn != null ? lrn.trim() : null;
+        String currentLrn = student.getLrn();
+        
+        if (newLrn != null && !newLrn.isEmpty()) {
+            // Check if LRN is being changed
+            if (!newLrn.equals(currentLrn)) {
+                // Check if another student already has this LRN
+                if (studentRepository.existsByLrn(newLrn)) {
+                    java.util.Optional<Student> existingStudent = studentRepository.findByLrn(newLrn);
+                    if (existingStudent.isPresent() && !existingStudent.get().getId().equals(id)) {
+                        throw new RuntimeException("LRN " + newLrn + " already exists for another student.");
+                    }
+                }
+                student.setLrn(newLrn);
+            }
+            // If LRN is the same, no need to update
+        } else {
+            // If new LRN is empty/null, clear it
+            student.setLrn(null);
+        }
+        
+        // Note: Grade Level, Strand, Section are NOT updated - they remain unchanged
+        
+        Student updatedStudent = studentRepository.save(student);
+        return StudentDto.fromStudent(updatedStudent);
+    }
+    
     @Transactional
     public void archiveStudent(Long id, String archiveReason) {
         Student student = studentRepository.findById(id)

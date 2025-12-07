@@ -68,16 +68,8 @@ public class DataInitializer implements CommandLineRunner {
     
     @Override
     public void run(String... args) throws Exception {
-        // Clear all teacher assignments to fix database conflicts
-        try {
-            if (teacherService != null) {
-                teacherService.clearAllTeacherAssignments();
-                System.out.println("✓ Cleared all teacher assignments from database");
-            }
-        } catch (Exception e) {
-            System.err.println("⚠ Warning: Could not clear teacher assignments: " + e.getMessage());
-            // Continue - don't block application startup
-        }
+        // NOTE: Removed code that was clearing all teacher assignments on startup
+        // This was causing data loss. Teacher assignments are now preserved across restarts.
         
         // Update database schema if needed (e.g., add TEACHER role support)
         if (databaseSchemaUpdater != null) {
@@ -89,42 +81,29 @@ public class DataInitializer implements CommandLineRunner {
             }
             
             // Ensure teacher_assignments table exists with correct schema
+            // NOTE: This will only fix schema if there are actual issues - it won't drop the table if schema is correct
             try {
                 databaseSchemaUpdater.ensureTeacherAssignmentsTableExists();
             } catch (Exception e) {
                 System.err.println("⚠ Warning: Could not verify teacher_assignments table: " + e.getMessage());
-                // Try force fix as last resort
-                try {
-                    System.out.println("🔄 Attempting force fix...");
-                    databaseSchemaUpdater.forceFixTeacherAssignmentsTable();
-                } catch (Exception e2) {
-                    System.err.println("⚠ Warning: Force fix also failed: " + e2.getMessage());
-                }
+                // Do NOT force fix here - it will drop the table and delete all data!
+                // Force fix should only be used manually when schema is corrupted
             }
         }
         
         // Comprehensive schema scan and fix
+        // NOTE: Only scan and fix if there are actual schema issues - do NOT force fix on every startup
+        // Force fixing drops and recreates the table, which deletes all data!
         if (databaseSchemaFixer != null) {
             try {
-                // First scan to detect issues
+                // Scan to detect issues - this will only fix if there are actual problems
+                // It will NOT drop the table if the schema is already correct
                 databaseSchemaFixer.scanAndFixTeacherAssignmentsTable();
-                
-                // If scan didn't fix it, force fix as backup
-                // (This ensures the table is always correct)
-                try {
-                    databaseSchemaFixer.forceFixTeacherAssignmentsTable();
-                } catch (Exception e2) {
-                    System.err.println("⚠ Warning: Force fix failed: " + e2.getMessage());
-                }
+                // Do NOT call forceFixTeacherAssignmentsTable() here - it drops the table unconditionally!
             } catch (Exception e) {
                 System.err.println("⚠ Warning: Schema scan/fix failed: " + e.getMessage());
-                // Try force fix as last resort
-                try {
-                    System.out.println("🔄 Attempting force fix as last resort...");
-                    databaseSchemaFixer.forceFixTeacherAssignmentsTable();
-                } catch (Exception e2) {
-                    System.err.println("⚠ Warning: Force fix also failed: " + e2.getMessage());
-                }
+                // Only log the error - do NOT force fix as it will delete all data
+                // Force fix should only be used manually when schema is corrupted
             }
         }
         
@@ -198,39 +177,25 @@ public class DataInitializer implements CommandLineRunner {
             e.printStackTrace();
         }
         
-        // Initialize test student data - clear and recreate 40 students (20 per grade)
+        // Initialize test student data - only if database is empty (first run)
+        // NOTE: This is disabled to preserve user-added students across restarts
+        // Uncomment the code below only if you need to reset the database with test data
+        /*
         try {
-            initializeTestStudents();
+            long existingStudentCount = studentRepository.count();
+            if (existingStudentCount == 0) {
+                // Only initialize test data if database is empty (first run)
+                initializeTestStudents();
+                addCapacityTestStudents();
+                createComprehensiveStudentDataset();
+            } else {
+                System.out.println("✓ Database already contains " + existingStudentCount + " students. Skipping test data initialization to preserve user data.");
+            }
         } catch (Exception e) {
             System.err.println("⚠ Warning: Failed to initialize test student data: " + e.getMessage());
             e.printStackTrace();
         }
-        
-        // Add 40 students to specific sections for capacity testing
-        try {
-            addCapacityTestStudents();
-        } catch (Exception e) {
-            System.err.println("⚠ Warning: Failed to add capacity test students: " + e.getMessage());
-            e.printStackTrace();
-        }
-        
-        // Clear all students from the database
-        try {
-            if (studentService != null) {
-                studentService.clearAllStudents();
-            }
-        } catch (Exception e) {
-            System.err.println("⚠ Warning: Failed to clear all students: " + e.getMessage());
-            e.printStackTrace();
-        }
-        
-        // Create comprehensive student dataset
-        try {
-            createComprehensiveStudentDataset();
-        } catch (Exception e) {
-            System.err.println("⚠ Warning: Failed to create comprehensive student dataset: " + e.getMessage());
-            e.printStackTrace();
-        }
+        */
         
         System.out.println("=".repeat(60));
         System.out.println("Seguinon Stand Alone Senior High School");

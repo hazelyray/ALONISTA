@@ -118,13 +118,12 @@ public class TeacherAccountManagementController implements Initializable {
         actionsColumn.setCellFactory(column -> new TableCell<UserDto, String>() {
             private final Button editButton = new Button("Edit");
             private final Button assignButton = new Button("Assign");
-            private final Button deleteButton = new Button("Delete");
-            private final HBox hbox = new HBox(5, editButton, assignButton, deleteButton);
+            private final Button deactivateButton = new Button();
+            private final HBox hbox = new HBox(5, editButton, assignButton, deactivateButton);
             
             {
                 editButton.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
                 assignButton.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
-                deleteButton.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
                 
                 editButton.setOnAction(e -> {
                     UserDto teacher = getTableView().getItems().get(getIndex());
@@ -136,9 +135,13 @@ public class TeacherAccountManagementController implements Initializable {
                     handleAssign(teacher);
                 });
                 
-                deleteButton.setOnAction(e -> {
+                deactivateButton.setOnAction(e -> {
                     UserDto teacher = getTableView().getItems().get(getIndex());
-                    handleDelete(teacher);
+                    if (teacher.getIsActive() != null && teacher.getIsActive()) {
+                        handleDeactivate(teacher);
+                    } else {
+                        handleActivate(teacher);
+                    }
                 });
             }
             
@@ -148,6 +151,18 @@ public class TeacherAccountManagementController implements Initializable {
                 if (empty) {
                     setGraphic(null);
                 } else {
+                    UserDto teacher = getTableView().getItems().get(getIndex());
+                    Boolean isActive = teacher.getIsActive();
+                    
+                    // Update button text and style based on account status
+                    if (isActive != null && isActive) {
+                        deactivateButton.setText("Deactivate");
+                        deactivateButton.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
+                    } else {
+                        deactivateButton.setText("Activate");
+                        deactivateButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
+                    }
+                    
                     hbox.setAlignment(javafx.geometry.Pos.CENTER);
                     setGraphic(hbox);
                 }
@@ -318,26 +333,26 @@ public class TeacherAccountManagementController implements Initializable {
         }
     }
     
-    private void handleDelete(UserDto teacher) {
+    private void handleDeactivate(UserDto teacher) {
         Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
-        confirmAlert.setTitle("Delete Teacher");
-        confirmAlert.setHeaderText("Delete Teacher Account");
-        confirmAlert.setContentText("Are you sure you want to delete the teacher account for:\n\n" +
+        confirmAlert.setTitle("Deactivate Teacher");
+        confirmAlert.setHeaderText("Deactivate Teacher Account");
+        confirmAlert.setContentText("Are you sure you want to deactivate the teacher account for:\n\n" +
                                    "Username: " + teacher.getUsername() + "\n" +
                                    "Full Name: " + teacher.getFullName() + "\n\n" +
-                                   "This action cannot be undone.");
+                                   "The teacher will not be able to login until the account is activated again.");
         
         confirmAlert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
                 new Thread(() -> {
                     try {
-                        teacherService.deleteTeacher(teacher.getId());
+                        teacherService.deactivateTeacher(teacher.getId());
                         
                         Platform.runLater(() -> {
                             Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
                             successAlert.setTitle("Success");
-                            successAlert.setHeaderText("Teacher Deleted");
-                            successAlert.setContentText("Teacher account has been deleted successfully.");
+                            successAlert.setHeaderText("Teacher Deactivated");
+                            successAlert.setContentText("Teacher account has been deactivated successfully. The teacher will not be able to login.");
                             successAlert.showAndWait();
                             
                             refreshData();
@@ -346,7 +361,43 @@ public class TeacherAccountManagementController implements Initializable {
                     } catch (Exception e) {
                         e.printStackTrace();
                         Platform.runLater(() -> {
-                            showError("Error deleting teacher: " + e.getMessage());
+                            showError("Error deactivating teacher: " + e.getMessage());
+                        });
+                    }
+                }).start();
+            }
+        });
+    }
+    
+    private void handleActivate(UserDto teacher) {
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Activate Teacher");
+        confirmAlert.setHeaderText("Activate Teacher Account");
+        confirmAlert.setContentText("Are you sure you want to activate the teacher account for:\n\n" +
+                                   "Username: " + teacher.getUsername() + "\n" +
+                                   "Full Name: " + teacher.getFullName() + "\n\n" +
+                                   "The teacher will be able to login after activation.");
+        
+        confirmAlert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                new Thread(() -> {
+                    try {
+                        teacherService.activateTeacher(teacher.getId());
+                        
+                        Platform.runLater(() -> {
+                            Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                            successAlert.setTitle("Success");
+                            successAlert.setHeaderText("Teacher Activated");
+                            successAlert.setContentText("Teacher account has been activated successfully. The teacher can now login.");
+                            successAlert.showAndWait();
+                            
+                            refreshData();
+                        });
+                        
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Platform.runLater(() -> {
+                            showError("Error activating teacher: " + e.getMessage());
                         });
                     }
                 }).start();

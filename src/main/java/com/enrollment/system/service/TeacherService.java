@@ -171,12 +171,25 @@ public class TeacherService {
     }
     
     @Transactional
-    public void deleteTeacher(Long id) {
+    public void deactivateTeacher(Long id) {
         User teacher = userRepository.findById(id)
                 .filter(user -> user.getRole() == User.UserRole.TEACHER)
                 .orElseThrow(() -> new RuntimeException("Teacher not found with id: " + id));
         
-        userRepository.delete(teacher);
+        teacher.setIsActive(false);
+        teacher.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(teacher);
+    }
+    
+    @Transactional
+    public void activateTeacher(Long id) {
+        User teacher = userRepository.findById(id)
+                .filter(user -> user.getRole() == User.UserRole.TEACHER)
+                .orElseThrow(() -> new RuntimeException("Teacher not found with id: " + id));
+        
+        teacher.setIsActive(true);
+        teacher.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(teacher);
     }
     
     @Transactional
@@ -369,6 +382,17 @@ public class TeacherService {
             }
             insertedCombinations.add(combination);
             
+            // Check if this subject-section combination is already assigned to a different teacher
+            java.util.Optional<TeacherAssignment> conflictingAssignment = 
+                teacherAssignmentRepository.findBySubjectIdAndSectionIdExcludingTeacher(subjectId, sectionId, teacherId);
+            
+            if (conflictingAssignment.isPresent()) {
+                TeacherAssignment conflict = conflictingAssignment.get();
+                String conflictingTeacherName = conflict.getTeacher() != null ? conflict.getTeacher().getFullName() : "Unknown Teacher";
+                throw new RuntimeException("Subject-section combination is already assigned to teacher: " + conflictingTeacherName + 
+                                         ". A subject-section combination can only be assigned to one teacher at a time.");
+            }
+            
             // Get fresh entities from database
             Subject subject = subjectMap.get(subjectId);
             Section section = sectionMap.get(sectionId);
@@ -410,6 +434,19 @@ public class TeacherService {
                 .map(TeacherAssignment::getSection)
                 .filter(section -> section != null) // Filter out null sections
                 .collect(Collectors.toList());
+    }
+    
+    /**
+     * Checks if a subject-section combination is already assigned to a different teacher.
+     * 
+     * @param subjectId The subject ID to check
+     * @param sectionId The section ID to check
+     * @param excludeTeacherId The teacher ID to exclude from the check (current teacher)
+     * @return Optional containing the conflicting TeacherAssignment if found, empty if no conflict
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<TeacherAssignment> findConflictingAssignment(Long subjectId, Long sectionId, Long excludeTeacherId) {
+        return teacherAssignmentRepository.findBySubjectIdAndSectionIdExcludingTeacher(subjectId, sectionId, excludeTeacherId);
     }
 }
 

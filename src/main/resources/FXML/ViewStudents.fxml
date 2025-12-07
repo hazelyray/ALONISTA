@@ -76,7 +76,7 @@
                         <TableColumn fx:id="contactColumn" text="Contact" prefWidth="120"/>
                         <TableColumn fx:id="parentGuardianColumn" text="Parent/Guardian" prefWidth="180"/>
                         <TableColumn fx:id="enrollmentStatusColumn" text="Status" prefWidth="100"/>
-                        <TableColumn fx:id="actionsColumn" text="Actions" prefWidth="120" resizable="false"/>
+                        <TableColumn fx:id="actionsColumn" text="Actions" prefWidth="240" resizable="false"/>
                     </columns>
                 </TableView>
             </VBox>

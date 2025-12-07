@@ -225,7 +225,7 @@ public class ViewStudentsController implements Initializable {
         // Actions column - custom cell factory for buttons
         actionsColumn.setCellFactory(column -> new TableCell<StudentDto, String>() {
             private final Button editButton = new Button("Edit");
-            private final Button deleteButton = new Button("Delete");
+            private final Button deleteButton = new Button("Archive to Logs");
             private final HBox hbox = new HBox(5, editButton, deleteButton);
             
             {
