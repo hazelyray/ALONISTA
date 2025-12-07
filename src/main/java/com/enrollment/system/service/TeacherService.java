@@ -18,6 +18,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @Service
@@ -230,6 +233,11 @@ public class TeacherService {
     }
     
     @Transactional(readOnly = true)
+    public long getTotalAssignmentCount(Long teacherId) {
+        return teacherAssignmentRepository.countTotalAssignmentsByTeacherId(teacherId);
+    }
+    
+    @Transactional(readOnly = true)
     public Map<Long, List<Section>> getSubjectSectionMap(Long teacherId) {
         List<TeacherAssignment> assignments = teacherAssignmentRepository.findByTeacherId(teacherId);
         
@@ -259,35 +267,46 @@ public class TeacherService {
         // Delete all existing assignments for this teacher first
         teacherAssignmentRepository.deleteByTeacherId(teacherId);
         
+        // Flush to ensure delete is committed before inserts (prevents unique constraint violations)
+        teacherAssignmentRepository.flush();
+        
         // If no assignments to save, we're done
         if (assignments == null || assignments.isEmpty()) {
             return;
         }
         
-        // Extract and validate IDs
-        List<Long> subjectIds = assignments.stream()
-                .map(a -> {
-                    if (a.getSubject() == null || a.getSubject().getId() == null) {
-                        throw new RuntimeException("Invalid assignment: subject is null or has no ID");
-                    }
-                    return a.getSubject().getId();
-                })
+        // Remove duplicates from assignments list to prevent unique constraint violations
+        // Use a Set to track unique combinations of (subjectId, sectionId)
+        Set<String> seenCombinations = new HashSet<>();
+        List<com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord> uniqueAssignments = new ArrayList<>();
+        
+        for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : assignments) {
+            if (assignmentRecord.getSubject() == null || assignmentRecord.getSubject().getId() == null ||
+                assignmentRecord.getSection() == null || assignmentRecord.getSection().getId() == null) {
+                continue; // Skip invalid assignments
+            }
+            
+            String combination = assignmentRecord.getSubject().getId() + "_" + assignmentRecord.getSection().getId();
+            if (!seenCombinations.contains(combination)) {
+                seenCombinations.add(combination);
+                uniqueAssignments.add(assignmentRecord);
+            }
+        }
+        
+        // Extract and validate IDs from unique assignments
+        List<Long> subjectIds = uniqueAssignments.stream()
+                .map(a -> a.getSubject().getId())
                 .distinct()
                 .collect(Collectors.toList());
         
-        List<Long> sectionIds = assignments.stream()
-                .map(a -> {
-                    if (a.getSection() == null || a.getSection().getId() == null) {
-                        throw new RuntimeException("Invalid assignment: section is null or has no ID");
-                    }
-                    return a.getSection().getId();
-                })
+        List<Long> sectionIds = uniqueAssignments.stream()
+                .map(a -> a.getSection().getId())
                 .distinct()
                 .collect(Collectors.toList());
         
-        // Validate maximum 8 unique subjects
-        if (subjectIds.size() > 8) {
-            throw new RuntimeException("A teacher can have a maximum of 8 unique subjects. Found: " + subjectIds.size());
+        // Validate maximum 8 total assignments (subject-section pairs)
+        if (uniqueAssignments.size() > 8) {
+            throw new RuntimeException("A teacher can have a maximum of 8 total assignments (subject-section pairs). Found: " + uniqueAssignments.size());
         }
         
         // Fetch all subjects and sections fresh from database
@@ -307,10 +326,21 @@ public class TeacherService {
         Map<Long, Section> sectionMap = sections.stream()
                 .collect(Collectors.toMap(Section::getId, s -> s));
         
-        // Create and save new assignments using fresh entities from database
-        for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : assignments) {
+        // Track what we're inserting to prevent duplicates in the same batch
+        Set<String> insertedCombinations = new HashSet<>();
+        List<TeacherAssignment> assignmentsToSave = new ArrayList<>();
+        
+        // Create new assignments using fresh entities from database
+        for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : uniqueAssignments) {
             Long subjectId = assignmentRecord.getSubject().getId();
             Long sectionId = assignmentRecord.getSection().getId();
+            
+            // Check for duplicates in the same batch
+            String combination = subjectId + "_" + sectionId;
+            if (insertedCombinations.contains(combination)) {
+                continue; // Skip duplicate
+            }
+            insertedCombinations.add(combination);
             
             // Get fresh entities from database
             Subject subject = subjectMap.get(subjectId);
@@ -325,7 +355,13 @@ public class TeacherService {
             
             // Create new assignment with fresh managed entities
             TeacherAssignment assignment = new TeacherAssignment(teacher, subject, section);
-            teacherAssignmentRepository.save(assignment);
+            assignmentsToSave.add(assignment);
+        }
+        
+        // Save all assignments in batch
+        if (!assignmentsToSave.isEmpty()) {
+            teacherAssignmentRepository.saveAll(assignmentsToSave);
+            teacherAssignmentRepository.flush(); // Ensure all inserts are committed
         }
     }
     

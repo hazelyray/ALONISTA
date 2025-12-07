@@ -43,4 +43,7 @@ public interface TeacherAssignmentRepository extends JpaRepository<TeacherAssign
     
     @Query("SELECT COUNT(DISTINCT ta.subject.id) FROM TeacherAssignment ta WHERE ta.teacher.id = :teacherId")
     long countDistinctSubjectsByTeacherId(@Param("teacherId") Long teacherId);
+    
+    @Query("SELECT COUNT(ta) FROM TeacherAssignment ta WHERE ta.teacher.id = :teacherId")
+    long countTotalAssignmentsByTeacherId(@Param("teacherId") Long teacherId);
 }

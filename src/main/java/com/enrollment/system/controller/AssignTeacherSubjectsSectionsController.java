@@ -314,15 +314,15 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
             // Check if there are too many assignments and warn user
             new Thread(() -> {
                 try {
-                    long uniqueSubjectCount = teacherService.getUniqueSubjectCount(teacher.getId());
-                    if (uniqueSubjectCount > 8) {
+                    long totalAssignmentCount = teacherService.getTotalAssignmentCount(teacher.getId());
+                    if (totalAssignmentCount > 8) {
                         Platform.runLater(() -> {
                             Alert warningAlert = new Alert(Alert.AlertType.WARNING);
                             warningAlert.setTitle("Too Many Assignments");
                             warningAlert.setHeaderText("Assignment Limit Exceeded");
-                            warningAlert.setContentText("This teacher currently has " + uniqueSubjectCount + " unique subjects assigned, " +
+                            warningAlert.setContentText("This teacher currently has " + totalAssignmentCount + " total assignments (subject-section pairs), " +
                                                        "which exceeds the maximum limit of 8.\n\n" +
-                                                       "Please use 'Clear All' to remove all assignments, then reassign subjects (maximum 8).");
+                                                       "Please use 'Clear All' to remove all assignments, then reassign (maximum 8 total assignments).");
                             warningAlert.showAndWait();
                         });
                     }
@@ -891,6 +891,12 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
             return;
         }
         
+        // Prevent assigning while a save is in progress
+        if (assignButton.isDisable() && "Saving...".equals(assignButton.getText())) {
+            showError("Please wait for the current save operation to complete before assigning another subject.");
+            return;
+        }
+        
         Subject selectedSubject = subjectComboBox.getValue();
         Section selectedSection = sectionComboBox.getValue();
         
@@ -942,33 +948,51 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
             return;
         }
         
-        // Check maximum 8 unique subjects before adding
-        // First, check against database to get current count
-        long currentUniqueSubjectCount = 0;
+        // Check maximum 8 total assignments (subject-section pairs) before adding
+        // Always check against database first to get the most current count
+        long currentTotalAssignmentCount = 0;
         try {
-            currentUniqueSubjectCount = teacherService.getUniqueSubjectCount(teacher.getId());
+            currentTotalAssignmentCount = teacherService.getTotalAssignmentCount(teacher.getId());
         } catch (Exception e) {
             // If database check fails, fall back to local list check
-            Set<Long> currentSubjectIds = assignments.stream()
-                .map(a -> a.getSubject().getId())
-                .collect(Collectors.toSet());
-            currentUniqueSubjectCount = currentSubjectIds.size();
+            System.err.println("Warning: Could not get total assignment count from database: " + e.getMessage());
+            currentTotalAssignmentCount = assignments.size();
         }
         
-        // Check if the new subject is already in the current assignments
-        boolean isNewSubject = assignments.stream()
-            .noneMatch(a -> a.getSubject().getId().equals(selectedSubject.getId()));
+        // Check if adding this assignment would exceed the limit of 8
+        // We need to check both database count and local list to account for unsaved assignments
+        long totalAfterAdding = currentTotalAssignmentCount;
         
-        // If it's a new subject, increment the count
-        if (isNewSubject) {
-            currentUniqueSubjectCount++;
+        // Check if this exact assignment already exists in database
+        boolean existsInDb = false;
+        try {
+            Map<Long, List<Section>> dbAssignments = teacherService.getSubjectSectionMap(teacher.getId());
+            List<Section> sectionsForSubject = dbAssignments.get(selectedSubject.getId());
+            if (sectionsForSubject != null) {
+                existsInDb = sectionsForSubject.stream()
+                    .anyMatch(s -> s.getId().equals(selectedSection.getId()));
+            }
+        } catch (Exception e) {
+            // If we can't check database, assume it doesn't exist
         }
         
-        if (currentUniqueSubjectCount > 8) {
-            showError("A teacher can have a maximum of 8 unique subjects. " +
-                     "Current unique subjects: " + (isNewSubject ? currentUniqueSubjectCount - 1 : currentUniqueSubjectCount) + 
+        // If this assignment doesn't exist in database, it will be a new assignment
+        if (!existsInDb) {
+            totalAfterAdding = currentTotalAssignmentCount + 1;
+        }
+        
+        // Also check local list to account for assignments added but not yet saved
+        long localCount = assignments.size();
+        if (localCount > currentTotalAssignmentCount) {
+            // There are unsaved assignments in the local list
+            totalAfterAdding = localCount + 1; // +1 for the new assignment we're about to add
+        }
+        
+        if (totalAfterAdding > 8) {
+            showError("A teacher can have a maximum of 8 total assignments (subject-section pairs). " +
+                     "Current assignments: " + Math.max(currentTotalAssignmentCount, localCount) + 
                      ". Cannot add more. " +
-                     "(Note: The same subject can be assigned to multiple sections, but total unique subjects cannot exceed 8)");
+                     "(Note: You can assign the same subject to multiple sections, but the total number of assignments cannot exceed 8)");
             return;
         }
         
@@ -1062,7 +1086,7 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
             return;
         }
         
-        // Disable assign button
+        // Disable assign button to prevent concurrent saves
         assignButton.setDisable(true);
         assignButton.setText("Saving...");
         
@@ -1077,11 +1101,19 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                 int retryDelay = 200;
                 Exception lastException = null;
                 
+                // Capture current assignments list to save
+                final List<AssignmentRecord> assignmentsToSave = new ArrayList<>(assignments);
+                
                 for (int attempt = 0; attempt < maxRetries; attempt++) {
                     try {
                         transactionTemplate.execute(status -> {
+                            // Validate capacity limit before saving - check total assignments (not unique subjects)
+                            if (assignmentsToSave.size() > 8) {
+                                throw new RuntimeException("A teacher can have a maximum of 8 total assignments (subject-section pairs). Found: " + assignmentsToSave.size());
+                            }
+                            
                             // Save actual assignments (subject-section pairs)
-                            teacherService.saveTeacherAssignments(teacher.getId(), new ArrayList<>(assignments));
+                            teacherService.saveTeacherAssignments(teacher.getId(), assignmentsToSave);
                             
                             return null;
                         });
@@ -1123,17 +1155,22 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                 }
                 
                 Platform.runLater(() -> {
+                    // Reload assignments from database first to ensure sync
+                    loadTeacherAssignments();
+                    
+                    // Re-enable assign button after reload completes
                     assignButton.setDisable(false);
                     assignButton.setText("Assign");
-                    // Reload assignments to ensure UI is in sync
-                    loadTeacherAssignments();
-                    // Show success message
-                    Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
-                    successAlert.setTitle("Success");
-                    successAlert.setHeaderText("Assignments Saved Successfully");
-                    successAlert.setContentText("The teacher's subject and section assignments have been saved. " +
-                                                  "The teacher dashboard will reflect these changes when refreshed.");
-                    successAlert.showAndWait();
+                    
+                    // Show success message (non-blocking)
+                    Platform.runLater(() -> {
+                        Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                        successAlert.setTitle("Success");
+                        successAlert.setHeaderText("Assignments Saved Successfully");
+                        successAlert.setContentText("The teacher's subject and section assignments have been saved. " +
+                                                      "The teacher dashboard will reflect these changes when refreshed.");
+                        successAlert.showAndWait();
+                    });
                 });
                 
             } catch (Exception e) {
@@ -1144,7 +1181,7 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                 // Provide more helpful error messages
                 if (errorMessage != null) {
                     if (errorMessage.contains("maximum of 8")) {
-                        detailedError = errorMessage;
+                        detailedError = errorMessage + "\n\nPlease remove some assignments before adding new ones.";
                     } else if (errorMessage.contains("not found")) {
                         detailedError = "Error: " + errorMessage + "\n\nPlease ensure all subjects and sections exist in the database.";
                     } else if (errorMessage.contains("null")) {
@@ -1159,11 +1196,12 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                 }
                 
                 Platform.runLater(() -> {
+                    // Reload assignments to sync with database state
+                    loadTeacherAssignments();
+                    
                     assignButton.setDisable(false);
                     assignButton.setText("Assign");
                     showError(detailedError);
-                    // Reload assignments to sync with database
-                    loadTeacherAssignments();
                 });
             }
         }).start();
