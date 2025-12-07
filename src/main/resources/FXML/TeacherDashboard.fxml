@@ -45,6 +45,12 @@
                 
                 <Button fx:id="btnMyStudents" text="  👥 My Students" onAction="#showMyStudents"
                         style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
+                
+                <Button fx:id="btnReports" text="  📊 Reports" onAction="#showReports"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
+                
+                <Button fx:id="btnAccountSettings" text="  ⚙️ Account Settings" onAction="#showAccountSettings"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
             </VBox>
             
             <!-- Spacer -->

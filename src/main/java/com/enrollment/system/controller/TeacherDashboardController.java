@@ -9,6 +9,7 @@ import com.enrollment.system.service.AuthService;
 import com.enrollment.system.service.TeacherService;
 import com.enrollment.system.service.SchoolYearService;
 import com.enrollment.system.service.StudentService;
+import com.enrollment.system.service.SubjectService;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -26,6 +27,8 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.*;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.FlowPane;
 import javafx.stage.Stage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
@@ -56,6 +59,12 @@ public class TeacherDashboardController {
     private Button btnMyStudents;
     
     @FXML
+    private Button btnReports;
+    
+    @FXML
+    private Button btnAccountSettings;
+    
+    @FXML
     private VBox dashboardContent;
     
     @Autowired
@@ -72,6 +81,9 @@ public class TeacherDashboardController {
     
     @Autowired(required = false)
     private StudentService studentService;
+    
+    @Autowired(required = false)
+    private SubjectService subjectService;
     
     private UserDto currentUser;
     private String sessionToken;
@@ -112,6 +124,24 @@ public class TeacherDashboardController {
                 btnMyStudents.setStyle(hoverStyle);
             });
             btnMyStudents.setOnMouseExited(e -> btnMyStudents.setStyle(originalStyle[0]));
+        }
+        
+        if (btnReports != null) {
+            final String[] originalStyle = {defaultStyle};
+            btnReports.setOnMouseEntered(e -> {
+                originalStyle[0] = btnReports.getStyle();
+                btnReports.setStyle(hoverStyle);
+            });
+            btnReports.setOnMouseExited(e -> btnReports.setStyle(originalStyle[0]));
+        }
+        
+        if (btnAccountSettings != null) {
+            final String[] originalStyle = {defaultStyle};
+            btnAccountSettings.setOnMouseEntered(e -> {
+                originalStyle[0] = btnAccountSettings.getStyle();
+                btnAccountSettings.setStyle(hoverStyle);
+            });
+            btnAccountSettings.setOnMouseExited(e -> btnAccountSettings.setStyle(originalStyle[0]));
         }
     }
     
@@ -185,11 +215,31 @@ public class TeacherDashboardController {
         loadStudentsPage();
     }
     
+    @FXML
+    private void showReports() {
+        resetButtonStyles();
+        if (btnReports != null) {
+            btnReports.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.4), 8, 0, 0, 0);");
+        }
+        loadReportsPage();
+    }
+    
+    @FXML
+    private void showAccountSettings() {
+        resetButtonStyles();
+        if (btnAccountSettings != null) {
+            btnAccountSettings.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(52,152,219,0.4), 8, 0, 0, 0);");
+        }
+        loadAccountSettingsPage();
+    }
+    
     private void resetButtonStyles() {
         String defaultStyle = "-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);";
         if (btnDashboard != null) btnDashboard.setStyle(defaultStyle);
         if (btnMySubjects != null) btnMySubjects.setStyle(defaultStyle);
         if (btnMyStudents != null) btnMyStudents.setStyle(defaultStyle);
+        if (btnReports != null) btnReports.setStyle(defaultStyle);
+        if (btnAccountSettings != null) btnAccountSettings.setStyle(defaultStyle);
     }
     
     private void loadDashboardContent() {
@@ -210,9 +260,45 @@ public class TeacherDashboardController {
         // Load data in background thread
         new Thread(() -> {
             try {
-                // Get teacher data
-                List<Subject> teacherSubjects = teacherService.getTeacherSubjects(currentUser.getId());
-                List<Section> teacherSections = teacherService.getTeacherSections(currentUser.getId());
+                // Get actual assignments from TeacherAssignment table (NEW SYSTEM)
+                java.util.Map<Long, List<Section>> subjectSectionMap = teacherService.getSubjectSectionMap(currentUser.getId());
+                
+                // Extract unique subjects from assignments
+                java.util.Set<Long> subjectIds = subjectSectionMap.keySet();
+                List<Subject> teacherSubjects = new java.util.ArrayList<>();
+                if (subjectService != null && !subjectIds.isEmpty()) {
+                    for (Long subjectId : subjectIds) {
+                        try {
+                            Subject subject = subjectService.getSubjectRepository().findById(subjectId).orElse(null);
+                            if (subject != null) {
+                                teacherSubjects.add(subject);
+                            }
+                        } catch (Exception e) {
+                            // Skip if subject not found
+                        }
+                    }
+                }
+                
+                // Extract unique sections from assignments (use IDs to avoid HashSet issues)
+                java.util.Set<Long> uniqueSectionIds = new java.util.HashSet<>();
+                for (List<Section> sections : subjectSectionMap.values()) {
+                    for (Section section : sections) {
+                        if (section != null && section.getId() != null) {
+                            uniqueSectionIds.add(section.getId());
+                        }
+                    }
+                }
+                // Convert back to List<Section> using the sections we already have
+                List<Section> teacherSections = new java.util.ArrayList<>();
+                for (List<Section> sections : subjectSectionMap.values()) {
+                    for (Section section : sections) {
+                        if (section != null && section.getId() != null && 
+                            uniqueSectionIds.contains(section.getId()) &&
+                            !teacherSections.stream().anyMatch(s -> s.getId().equals(section.getId()))) {
+                            teacherSections.add(section);
+                        }
+                    }
+                }
                 
                 // Get current school year
                 String schoolYearText = "N/A";
@@ -306,11 +392,48 @@ public class TeacherDashboardController {
         
         dashboardContent.getChildren().clear();
         
-        // Load data in background thread
+        // Load data in background thread - ONLY from actual assignments
         new Thread(() -> {
             try {
-                List<Subject> teacherSubjects = teacherService.getTeacherSubjects(currentUser.getId());
-                List<Section> teacherSections = teacherService.getTeacherSections(currentUser.getId());
+                // Get actual assignments from TeacherAssignment table
+                java.util.Map<Long, List<Section>> subjectSectionMap = teacherService.getSubjectSectionMap(currentUser.getId());
+                
+                // Extract unique subjects from assignments
+                java.util.Set<Long> subjectIds = subjectSectionMap.keySet();
+                List<Subject> teacherSubjects = new java.util.ArrayList<>();
+                if (subjectService != null && !subjectIds.isEmpty()) {
+                    for (Long subjectId : subjectIds) {
+                        try {
+                            Subject subject = subjectService.getSubjectRepository().findById(subjectId).orElse(null);
+                            if (subject != null) {
+                                teacherSubjects.add(subject);
+                            }
+                        } catch (Exception e) {
+                            // Skip if subject not found
+                        }
+                    }
+                }
+                
+                // Extract unique sections from assignments (use IDs to avoid HashSet issues)
+                java.util.Set<Long> uniqueSectionIds = new java.util.HashSet<>();
+                for (List<Section> sections : subjectSectionMap.values()) {
+                    for (Section section : sections) {
+                        if (section != null && section.getId() != null) {
+                            uniqueSectionIds.add(section.getId());
+                        }
+                    }
+                }
+                // Convert back to List<Section> using the sections we already have
+                List<Section> teacherSections = new java.util.ArrayList<>();
+                for (List<Section> sections : subjectSectionMap.values()) {
+                    for (Section section : sections) {
+                        if (section != null && section.getId() != null && 
+                            uniqueSectionIds.contains(section.getId()) &&
+                            !teacherSections.stream().anyMatch(s -> s.getId().equals(section.getId()))) {
+                            teacherSections.add(section);
+                        }
+                    }
+                }
                 
                 Platform.runLater(() -> {
                     buildSubjectsPage(teacherSubjects, teacherSections);
@@ -330,52 +453,261 @@ public class TeacherDashboardController {
         dashboardContent.getChildren().clear();
         
         // Page Title
+        HBox titleBox = new HBox();
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        titleBox.setPadding(new Insets(0, 0, 30, 0));
+        
         Label pageTitle = new Label("My Assigned Subjects");
-        pageTitle.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 25 0;");
-        dashboardContent.getChildren().add(pageTitle);
+        pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        titleBox.getChildren().add(pageTitle);
+        dashboardContent.getChildren().add(titleBox);
         
         if (subjects.isEmpty()) {
+            VBox emptyBox = new VBox(15);
+            emptyBox.setAlignment(Pos.CENTER);
+            emptyBox.setPadding(new Insets(60, 20, 60, 20));
+            
+            Label emptyIcon = new Label("📚");
+            emptyIcon.setStyle("-fx-font-size: 64px;");
+            
             Label noSubjectsLabel = new Label("No subjects assigned yet.");
-            noSubjectsLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #95a5a6; -fx-padding: 20;");
-            dashboardContent.getChildren().add(noSubjectsLabel);
+            noSubjectsLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #95a5a6;");
+            
+            emptyBox.getChildren().addAll(emptyIcon, noSubjectsLabel);
+            dashboardContent.getChildren().add(emptyBox);
         } else {
-            VBox subjectsList = new VBox(10);
+            // Create a grid layout for subjects
+            GridPane subjectsGrid = new GridPane();
+            subjectsGrid.setHgap(20);
+            subjectsGrid.setVgap(20);
+            subjectsGrid.setPadding(new Insets(0, 0, 20, 0));
+            
+            int col = 0;
+            int row = 0;
+            int colsPerRow = 2;
+            
+            // Get students data for section navigation
+            final List<Section> finalSections = sections;
+            java.util.Map<Long, List<StudentDto>> studentsBySection = new java.util.HashMap<>();
+            if (studentService != null && currentUser != null) {
+                try {
+                    List<StudentDto> allStudents = studentService.getAllStudents();
+                    studentsBySection = allStudents.stream()
+                        .filter(s -> s.getSectionId() != null && "Enrolled".equals(s.getEnrollmentStatus()))
+                        .collect(Collectors.groupingBy(StudentDto::getSectionId));
+                } catch (Exception e) {
+                    // Ignore - will show empty sections
+                }
+            }
+            
+            final java.util.Map<Long, List<StudentDto>> finalStudentsBySection = studentsBySection;
+            
             for (Subject subject : subjects) {
-                HBox subjectRow = new HBox(20);
-                subjectRow.setAlignment(Pos.CENTER_LEFT);
-                subjectRow.setPadding(new Insets(15, 20, 15, 20));
-                subjectRow.setStyle(
-                    "-fx-background-color: white; " +
-                    "-fx-background-radius: 10; " +
-                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 8, 0, 0, 3);"
+                VBox subjectCard = createSubjectCard(subject, finalSections, finalStudentsBySection);
+                subjectsGrid.add(subjectCard, col, row);
+                
+                col++;
+                if (col >= colsPerRow) {
+                    col = 0;
+                    row++;
+                }
+            }
+            
+            dashboardContent.getChildren().add(subjectsGrid);
+        }
+    }
+    
+    private VBox createSubjectCard(Subject subject, List<Section> sections, java.util.Map<Long, List<StudentDto>> studentsBySection) {
+        VBox card = new VBox(12);
+        card.setAlignment(Pos.TOP_LEFT);
+        card.setPadding(new Insets(20, 20, 20, 20));
+        card.setPrefWidth(350);
+        card.setPrefHeight(180);
+        
+        // Simple, clean background - no gradient, just a subtle color
+        String[] gradientColors = getGradientForGrade(subject.getGradeLevel());
+        String primaryColor = gradientColors[0];
+        
+        card.setStyle(
+            "-fx-background-color: #ffffff; " +
+            "-fx-background-radius: 12; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); " +
+            "-fx-border-color: " + primaryColor + "; " +
+            "-fx-border-width: 2; " +
+            "-fx-border-radius: 12;"
+        );
+        
+        // Subject Name - simple and clean
+        Label subjectName = new Label(subject.getName());
+        subjectName.setStyle(
+            "-fx-font-size: 18px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #2c3e50;"
+        );
+        subjectName.setWrapText(true);
+        
+        // Grade Level - simple badge
+        Label gradeLabel = new Label("Grade " + (subject.getGradeLevel() != null ? subject.getGradeLevel() : "N/A"));
+        gradeLabel.setStyle(
+            "-fx-font-size: 12px; " +
+            "-fx-text-fill: " + primaryColor + "; " +
+            "-fx-font-weight: 600; " +
+            "-fx-background-color: " + primaryColor + "15; " +
+            "-fx-padding: 4 10; " +
+            "-fx-background-radius: 8;"
+        );
+        
+        // Sections - compact display
+        VBox sectionsBox = new VBox(8);
+        Label sectionsTitle = new Label("Sections:");
+        sectionsTitle.setStyle(
+            "-fx-font-size: 12px; " +
+            "-fx-text-fill: #7f8c8d; " +
+            "-fx-font-weight: 600;"
+        );
+        sectionsBox.getChildren().add(sectionsTitle);
+        
+        // Get sections that are actually assigned to this specific subject
+        // Only show sections that are explicitly assigned - no fallback
+        List<Section> matchingSections = new java.util.ArrayList<>();
+        if (teacherService != null && currentUser != null) {
+            try {
+                matchingSections = teacherService.getSectionsForSubject(currentUser.getId(), subject.getId());
+            } catch (Exception e) {
+                // If there's an error, show empty list - don't show unassigned sections
+                matchingSections = new java.util.ArrayList<>();
+            }
+        }
+        
+        if (matchingSections.isEmpty()) {
+            Label noSectionsLabel = new Label("No sections assigned");
+            noSectionsLabel.setStyle(
+                "-fx-font-size: 11px; " +
+                "-fx-text-fill: #95a5a6; " +
+                "-fx-font-style: italic;"
+            );
+            sectionsBox.getChildren().add(noSectionsLabel);
+        } else {
+            FlowPane sectionsFlow = new FlowPane();
+            sectionsFlow.setHgap(6);
+            sectionsFlow.setVgap(6);
+            
+            final String finalPrimaryColor = primaryColor;
+            for (Section section : matchingSections) {
+                List<StudentDto> sectionStudents = studentsBySection.getOrDefault(section.getId(), new java.util.ArrayList<>());
+                int studentCount = sectionStudents.size();
+                
+                Label sectionBadge = new Label(section.getName() + (studentCount > 0 ? " (" + studentCount + ")" : ""));
+                sectionBadge.setStyle(
+                    "-fx-background-color: " + finalPrimaryColor + "20; " +
+                    "-fx-text-fill: " + finalPrimaryColor + "; " +
+                    "-fx-font-size: 11px; " +
+                    "-fx-font-weight: 600; " +
+                    "-fx-padding: 4 10; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-cursor: hand;"
                 );
                 
-                Label subjectName = new Label(subject.getName());
-                subjectName.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-pref-width: 350;");
+                // Simple hover effect
+                sectionBadge.setOnMouseEntered(e -> {
+                    sectionBadge.setStyle(
+                        "-fx-background-color: " + finalPrimaryColor + "; " +
+                        "-fx-text-fill: white; " +
+                        "-fx-font-size: 11px; " +
+                        "-fx-font-weight: 600; " +
+                        "-fx-padding: 4 10; " +
+                        "-fx-background-radius: 6; " +
+                        "-fx-cursor: hand;"
+                    );
+                });
                 
-                Label gradeLabel = new Label("Grade " + (subject.getGradeLevel() != null ? subject.getGradeLevel() : "N/A"));
-                gradeLabel.setStyle("-fx-font-size: 15px; -fx-text-fill: #7f8c8d; -fx-pref-width: 120;");
+                sectionBadge.setOnMouseExited(e -> {
+                    sectionBadge.setStyle(
+                        "-fx-background-color: " + finalPrimaryColor + "20; " +
+                        "-fx-text-fill: " + finalPrimaryColor + "; " +
+                        "-fx-font-size: 11px; " +
+                        "-fx-font-weight: 600; " +
+                        "-fx-padding: 4 10; " +
+                        "-fx-background-radius: 6; " +
+                        "-fx-cursor: hand;"
+                    );
+                });
                 
-                // Find sections that match this subject's grade level
-                String sectionNames = sections.stream()
-                    .filter(section -> subject.getGradeLevel() != null && 
-                            section.getGradeLevel() != null && 
-                            section.getGradeLevel().equals(subject.getGradeLevel()))
-                    .map(Section::getName)
-                    .collect(Collectors.joining(", "));
+                // Make clickable - navigate to students page and show this section
+                final Section finalSection = section;
+                final List<StudentDto> finalSectionStudents = sectionStudents;
+                sectionBadge.setOnMouseClicked(e -> {
+                    // Navigate to My Students page first
+                    if (btnMyStudents != null) {
+                        showMyStudents();
+                    }
+                    // After a short delay, show the specific section
+                    new Thread(() -> {
+                        try {
+                            Thread.sleep(500); // Wait for page to load
+                            Platform.runLater(() -> {
+                                if (dashboardContent != null) {
+                                    showSectionStudents(finalSection, finalSectionStudents);
+                                }
+                            });
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }).start();
+                });
                 
-                if (sectionNames.isEmpty()) {
-                    sectionNames = "No matching sections";
-                }
-                
-                Label sectionLabel = new Label("Sections: " + sectionNames);
-                sectionLabel.setStyle("-fx-font-size: 15px; -fx-text-fill: #7f8c8d;");
-                sectionLabel.setWrapText(true);
-                
-                subjectRow.getChildren().addAll(subjectName, gradeLabel, sectionLabel);
-                subjectsList.getChildren().add(subjectRow);
+                sectionsFlow.getChildren().add(sectionBadge);
             }
-            dashboardContent.getChildren().add(subjectsList);
+            sectionsBox.getChildren().add(sectionsFlow);
+        }
+        
+        card.getChildren().addAll(subjectName, gradeLabel, sectionsBox);
+        
+        // Simple hover effect
+        card.setOnMouseEntered(e -> {
+            card.setStyle(
+                "-fx-background-color: #f8f9fa; " +
+                "-fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 10, 0, 0, 3); " +
+                "-fx-border-color: " + primaryColor + "; " +
+                "-fx-border-width: 2; " +
+                "-fx-border-radius: 12; " +
+                "-fx-cursor: default;"
+            );
+        });
+        
+        card.setOnMouseExited(e -> {
+            card.setStyle(
+                "-fx-background-color: #ffffff; " +
+                "-fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); " +
+                "-fx-border-color: " + primaryColor + "; " +
+                "-fx-border-width: 2; " +
+                "-fx-border-radius: 12; " +
+                "-fx-cursor: default;"
+            );
+        });
+        
+        return card;
+    }
+    
+    private String[] getGradientForGrade(Integer gradeLevel) {
+        // Professional gradient colors - clean, modern, and elegant
+        // Grade 11: Professional blue gradient
+        // Grade 12: Professional indigo gradient
+        if (gradeLevel == null) {
+            return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"}; // Default: Professional blue
+        }
+        
+        switch (gradeLevel) {
+            case 11:
+                // Professional blue gradient - clean and modern
+                return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"};
+            case 12:
+                // Professional indigo gradient - elegant and refined
+                return new String[]{"#845ef7", "#7048e8", "#5f3dc4"};
+            default:
+                return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"}; // Default: Professional blue
         }
     }
     
@@ -386,10 +718,33 @@ public class TeacherDashboardController {
         
         dashboardContent.getChildren().clear();
         
-        // Load data in background thread
+        // Load data in background thread - ONLY from actual assignments
         new Thread(() -> {
             try {
-                List<Section> teacherSections = teacherService.getTeacherSections(currentUser.getId());
+                // Get actual assignments from TeacherAssignment table - extract unique sections
+                java.util.Map<Long, List<Section>> subjectSectionMap = teacherService.getSubjectSectionMap(currentUser.getId());
+                
+                // Extract unique sections from assignments (use IDs to avoid HashSet issues)
+                java.util.Set<Long> uniqueSectionIds = new java.util.HashSet<>();
+                for (List<Section> sections : subjectSectionMap.values()) {
+                    for (Section section : sections) {
+                        if (section != null && section.getId() != null) {
+                            uniqueSectionIds.add(section.getId());
+                        }
+                    }
+                }
+                // Convert back to List<Section> using the sections we already have
+                List<Section> teacherSections = new java.util.ArrayList<>();
+                for (List<Section> sections : subjectSectionMap.values()) {
+                    for (Section section : sections) {
+                        if (section != null && section.getId() != null && 
+                            uniqueSectionIds.contains(section.getId()) &&
+                            !teacherSections.stream().anyMatch(s -> s.getId().equals(section.getId()))) {
+                            teacherSections.add(section);
+                        }
+                    }
+                }
+                
                 List<StudentDto> allStudents = studentService.getAllStudents();
                 
                 final List<Section> finalTeacherSections = teacherSections;
@@ -422,19 +777,316 @@ public class TeacherDashboardController {
         dashboardContent.getChildren().clear();
         
         // Page Title
+        HBox titleBox = new HBox();
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        titleBox.setPadding(new Insets(0, 0, 30, 0));
+        
         Label pageTitle = new Label("My Students");
-        pageTitle.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 25 0;");
-        dashboardContent.getChildren().add(pageTitle);
+        pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        titleBox.getChildren().add(pageTitle);
+        dashboardContent.getChildren().add(titleBox);
+        
+        // Load sections for the teacher
+        if (teacherService == null || currentUser == null) {
+            Label errorLabel = new Label("Unable to load sections.");
+            errorLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #e74c3c; -fx-padding: 20;");
+            dashboardContent.getChildren().add(errorLabel);
+            return;
+        }
+        
+        new Thread(() -> {
+            try {
+                // Get actual assignments from TeacherAssignment table - extract unique sections
+                java.util.Map<Long, List<Section>> subjectSectionMap = teacherService.getSubjectSectionMap(currentUser.getId());
+                
+                // Extract unique sections from assignments (use IDs to avoid HashSet issues)
+                java.util.Set<Long> uniqueSectionIds = new java.util.HashSet<>();
+                for (List<Section> sections : subjectSectionMap.values()) {
+                    for (Section section : sections) {
+                        if (section != null && section.getId() != null) {
+                            uniqueSectionIds.add(section.getId());
+                        }
+                    }
+                }
+                // Convert back to List<Section> using the sections we already have
+                List<Section> teacherSections = new java.util.ArrayList<>();
+                for (List<Section> sections : subjectSectionMap.values()) {
+                    for (Section section : sections) {
+                        if (section != null && section.getId() != null && 
+                            uniqueSectionIds.contains(section.getId()) &&
+                            !teacherSections.stream().anyMatch(s -> s.getId().equals(section.getId()))) {
+                            teacherSections.add(section);
+                        }
+                    }
+                }
+                
+                // Group students by section
+                final List<Section> finalSections = teacherSections;
+                java.util.Map<Long, List<StudentDto>> studentsBySection = students.stream()
+                    .filter(s -> s.getSectionId() != null)
+                    .collect(Collectors.groupingBy(StudentDto::getSectionId));
+                
+                Platform.runLater(() -> {
+                    buildSectionsView(finalSections, studentsBySection);
+                });
+            } catch (Exception e) {
+                e.printStackTrace();
+                Platform.runLater(() -> {
+                    Label errorLabel = new Label("Error loading sections: " + e.getMessage());
+                    errorLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #e74c3c; -fx-padding: 20;");
+                    dashboardContent.getChildren().add(errorLabel);
+                });
+            }
+        }).start();
+    }
+    
+    private void buildSectionsView(List<Section> sections, java.util.Map<Long, List<StudentDto>> studentsBySection) {
+        // Clear existing content except title
+        if (dashboardContent.getChildren().size() > 1) {
+            dashboardContent.getChildren().remove(1, dashboardContent.getChildren().size());
+        }
+        
+        if (sections.isEmpty()) {
+            VBox emptyBox = new VBox(15);
+            emptyBox.setAlignment(Pos.CENTER);
+            emptyBox.setPadding(new Insets(60, 20, 60, 20));
+            
+            Label emptyIcon = new Label("🏫");
+            emptyIcon.setStyle("-fx-font-size: 64px;");
+            
+            Label noSectionsLabel = new Label("No sections assigned yet.");
+            noSectionsLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #95a5a6;");
+            
+            emptyBox.getChildren().addAll(emptyIcon, noSectionsLabel);
+            dashboardContent.getChildren().add(emptyBox);
+        } else {
+            // Instructions
+            Label instructionLabel = new Label("Click on a section to view its students");
+            instructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #7f8c8d; -fx-padding: 0 0 20 0;");
+            dashboardContent.getChildren().add(instructionLabel);
+            
+            // Create grid for section cards
+            GridPane sectionsGrid = new GridPane();
+            sectionsGrid.setHgap(20);
+            sectionsGrid.setVgap(20);
+            sectionsGrid.setPadding(new Insets(0, 0, 20, 0));
+            
+            int col = 0;
+            int row = 0;
+            int colsPerRow = 3;
+            
+            for (Section section : sections) {
+                List<StudentDto> sectionStudents = studentsBySection.getOrDefault(section.getId(), new java.util.ArrayList<>());
+                VBox sectionCard = createSectionCard(section, sectionStudents.size());
+                sectionCard.setOnMouseClicked(e -> showSectionStudents(section, sectionStudents));
+                sectionsGrid.add(sectionCard, col, row);
+                
+                col++;
+                if (col >= colsPerRow) {
+                    col = 0;
+                    row++;
+                }
+            }
+            
+            dashboardContent.getChildren().add(sectionsGrid);
+        }
+    }
+    
+    private VBox createSectionCard(Section section, int studentCount) {
+        VBox card = new VBox(12);
+        card.setAlignment(Pos.CENTER);
+        card.setPadding(new Insets(20, 20, 20, 20));
+        card.setPrefWidth(280);
+        card.setPrefHeight(160);
+        
+        // Color scheme based on strand - simpler, cleaner
+        String[] colors = getColorSchemeForStrand(section.getStrand());
+        String primaryColor = colors[0];
+        
+        // Simple white background with colored border
+        card.setStyle(
+            "-fx-background-color: #ffffff; " +
+            "-fx-background-radius: 12; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); " +
+            "-fx-border-color: " + primaryColor + "; " +
+            "-fx-border-width: 2; " +
+            "-fx-border-radius: 12;"
+        );
+        
+        // Section Name
+        Label sectionName = new Label(section.getName());
+        sectionName.setStyle(
+            "-fx-font-size: 18px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #2c3e50;"
+        );
+        
+        // Strand and Grade
+        Label strandLabel = new Label(section.getStrand() + " • Grade " + (section.getGradeLevel() != null ? section.getGradeLevel() : "N/A"));
+        strandLabel.setStyle(
+            "-fx-font-size: 12px; " +
+            "-fx-text-fill: #7f8c8d; " +
+            "-fx-font-weight: 500;"
+        );
+        
+        // Student count
+        Label studentCountLabel = new Label(studentCount + " student" + (studentCount != 1 ? "s" : ""));
+        studentCountLabel.setStyle(
+            "-fx-font-size: 14px; " +
+            "-fx-font-weight: 600; " +
+            "-fx-text-fill: " + primaryColor + "; " +
+            "-fx-padding: 6 0 0 0;"
+        );
+        
+        card.getChildren().addAll(sectionName, strandLabel, studentCountLabel);
+        
+        // Simple hover effect
+        card.setOnMouseEntered(e -> {
+            card.setStyle(
+                "-fx-background-color: " + primaryColor + "08; " +
+                "-fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 10, 0, 0, 3); " +
+                "-fx-border-color: " + primaryColor + "; " +
+                "-fx-border-width: 2; " +
+                "-fx-border-radius: 12; " +
+                "-fx-cursor: hand;"
+            );
+        });
+        
+        card.setOnMouseExited(e -> {
+            card.setStyle(
+                "-fx-background-color: #ffffff; " +
+                "-fx-background-radius: 12; " +
+                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); " +
+                "-fx-border-color: " + primaryColor + "; " +
+                "-fx-border-width: 2; " +
+                "-fx-border-radius: 12; " +
+                "-fx-cursor: default;"
+            );
+        });
+        
+        return card;
+    }
+    
+    private String[] getColorSchemeForStrand(String strand) {
+        if (strand == null) {
+            return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"}; // Professional blue
+        }
+        
+        switch (strand.toUpperCase()) {
+            case "ABM":
+                return new String[]{"#ff6b6b", "#ee5a6f", "#ff8787"}; // Professional coral
+            case "HUMSS":
+                return new String[]{"#9775fa", "#845ef7", "#b197fc"}; // Professional purple
+            case "STEM":
+                return new String[]{"#4dabf7", "#339af0", "#74c0fc"}; // Professional blue
+            case "GAS":
+                return new String[]{"#51cf66", "#40c057", "#69db7c"}; // Professional green
+            case "TVL":
+                return new String[]{"#ff922b", "#fd7e14", "#ffa94d"}; // Professional orange
+            default:
+                return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"}; // Default Professional blue
+        }
+    }
+    
+    private void showSectionStudents(Section section, List<StudentDto> students) {
+        dashboardContent.getChildren().clear();
+        
+        // Back button and title
+        HBox headerBox = new HBox(15);
+        headerBox.setAlignment(Pos.CENTER_LEFT);
+        headerBox.setPadding(new Insets(0, 0, 25, 0));
+        
+        Button backButton = new Button("← Back to Sections");
+        backButton.setStyle(
+            "-fx-background-color: #95a5a6; " +
+            "-fx-text-fill: white; " +
+            "-fx-font-size: 14px; " +
+            "-fx-padding: 10 20; " +
+            "-fx-background-radius: 8; " +
+            "-fx-cursor: hand;"
+        );
+        backButton.setOnAction(e -> loadStudentsPage());
+        
+        Label pageTitle = new Label(section.getName() + " - Students");
+        pageTitle.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        
+        headerBox.getChildren().addAll(backButton, pageTitle);
+        dashboardContent.getChildren().add(headerBox);
         
         if (students.isEmpty()) {
-            Label noStudentsLabel = new Label("No enrolled students in assigned sections.");
-            noStudentsLabel.setStyle("-fx-font-size: 16px; -fx-text-fill: #95a5a6; -fx-padding: 20;");
-            dashboardContent.getChildren().add(noStudentsLabel);
+            VBox emptyBox = new VBox(15);
+            emptyBox.setAlignment(Pos.CENTER);
+            emptyBox.setPadding(new Insets(60, 20, 60, 20));
+            
+            Label emptyIcon = new Label("👥");
+            emptyIcon.setStyle("-fx-font-size: 64px;");
+            
+            Label noStudentsLabel = new Label("No enrolled students in this section.");
+            noStudentsLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #95a5a6;");
+            
+            emptyBox.getChildren().addAll(emptyIcon, noStudentsLabel);
+            dashboardContent.getChildren().add(emptyBox);
         } else {
             TableView<StudentDto> studentsTable = createStudentsTable(students);
             studentsTable.setPrefHeight(600);
             dashboardContent.getChildren().add(studentsTable);
         }
+    }
+    
+    private void loadReportsPage() {
+        if (dashboardContent == null) {
+            return;
+        }
+        
+        dashboardContent.getChildren().clear();
+        
+        // Page Title
+        Label pageTitle = new Label("Reports");
+        pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 30 0;");
+        dashboardContent.getChildren().add(pageTitle);
+        
+        // Empty state
+        VBox emptyBox = new VBox(15);
+        emptyBox.setAlignment(Pos.CENTER);
+        emptyBox.setPadding(new Insets(60, 20, 60, 20));
+        
+        Label emptyIcon = new Label("📊");
+        emptyIcon.setStyle("-fx-font-size: 64px;");
+        
+        Label emptyLabel = new Label("Reports feature coming soon.");
+        emptyLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #95a5a6;");
+        
+        emptyBox.getChildren().addAll(emptyIcon, emptyLabel);
+        dashboardContent.getChildren().add(emptyBox);
+    }
+    
+    private void loadAccountSettingsPage() {
+        if (dashboardContent == null) {
+            return;
+        }
+        
+        dashboardContent.getChildren().clear();
+        
+        // Page Title
+        Label pageTitle = new Label("Account Settings");
+        pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 30 0;");
+        dashboardContent.getChildren().add(pageTitle);
+        
+        // Empty state
+        VBox emptyBox = new VBox(15);
+        emptyBox.setAlignment(Pos.CENTER);
+        emptyBox.setPadding(new Insets(60, 20, 60, 20));
+        
+        Label emptyIcon = new Label("⚙️");
+        emptyIcon.setStyle("-fx-font-size: 64px;");
+        
+        Label emptyLabel = new Label("Account settings feature coming soon.\nYou will be able to update your name, password, and profile picture.");
+        emptyLabel.setStyle("-fx-font-size: 18px; -fx-text-fill: #95a5a6; -fx-text-alignment: center;");
+        emptyLabel.setWrapText(true);
+        
+        emptyBox.getChildren().addAll(emptyIcon, emptyLabel);
+        dashboardContent.getChildren().add(emptyBox);
     }
     
     private VBox createSummaryCard(String title, String value, String color) {

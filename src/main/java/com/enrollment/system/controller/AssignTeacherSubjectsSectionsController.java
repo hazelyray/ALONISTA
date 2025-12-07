@@ -100,6 +100,9 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
     @FXML
     private Button cancelButton;
     
+    @FXML
+    private Button clearAllButton;
+    
     @Autowired
     private TeacherService teacherService;
     
@@ -140,15 +143,20 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
             {
                 removeButton.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
                 removeButton.setOnAction(e -> {
-                    AssignmentRecord record = getTableView().getItems().get(getIndex());
-                    handleRemoveAssignment(record);
+                    int index = getIndex();
+                    if (index >= 0 && index < getTableView().getItems().size()) {
+                        AssignmentRecord record = getTableView().getItems().get(index);
+                        if (record != null) {
+                            handleRemoveAssignment(record, index);
+                        }
+                    }
                 });
             }
             
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty) {
+                if (empty || getIndex() < 0 || getIndex() >= getTableView().getItems().size()) {
                     setGraphic(null);
                 } else {
                     setGraphic(removeButton);
@@ -162,6 +170,9 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
         deleteSubjectButton.setOnAction(e -> handleDeleteSelectedSubject());
         assignButton.setOnAction(e -> handleAssign());
         cancelButton.setOnAction(e -> handleCancel());
+        if (clearAllButton != null) {
+            clearAllButton.setOnAction(e -> handleClearAllAssignments());
+        }
         
         // Set up combo box cell factories for Subject
         if (subjectComboBox != null) {
@@ -238,10 +249,35 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
         
         // Update sections when strand or grade changes
         strandComboBox.setOnAction(e -> updateSectionsByStrandAndGrade());
-        gradeComboBox.setOnAction(e -> updateSectionsByStrandAndGrade());
+        gradeComboBox.setOnAction(e -> {
+            updateSectionsByStrandAndGrade();
+            updateSubjectsByGrade(); // Filter subjects by selected grade
+        });
         
         // Update grade ComboBox when section changes (auto-select matching grade)
-        sectionComboBox.setOnAction(e -> updateGradeFromSection());
+        sectionComboBox.setOnAction(e -> {
+            updateGradeFromSection();
+            updateSubjectsByGrade(); // Filter subjects when section changes
+        });
+        
+        // Validate subject-section grade match when subject is selected
+        subjectComboBox.setOnAction(e -> {
+            Subject selectedSubject = subjectComboBox.getValue();
+            Section selectedSection = sectionComboBox.getValue();
+            
+            if (selectedSubject != null && selectedSection != null) {
+                Integer subjectGrade = selectedSubject.getGradeLevel();
+                Integer sectionGrade = selectedSection.getGradeLevel();
+                
+                if (subjectGrade != null && sectionGrade != null && !subjectGrade.equals(sectionGrade)) {
+                    // Clear subject selection and show warning
+                    subjectComboBox.setValue(null);
+                    showError("Grade mismatch: Selected subject is for Grade " + subjectGrade + 
+                             " but selected section is for Grade " + sectionGrade + 
+                             ". Please select a subject that matches the section's grade level.");
+                }
+            }
+        });
         
         // Initialize assignments list
         assignments = FXCollections.observableArrayList();
@@ -275,7 +311,26 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
         
         // Load teacher's current assignments
         if (teacher != null) {
-            loadTeacherAssignments();
+            // Check if there are too many assignments and warn user
+            new Thread(() -> {
+                try {
+                    long uniqueSubjectCount = teacherService.getUniqueSubjectCount(teacher.getId());
+                    if (uniqueSubjectCount > 8) {
+                        Platform.runLater(() -> {
+                            Alert warningAlert = new Alert(Alert.AlertType.WARNING);
+                            warningAlert.setTitle("Too Many Assignments");
+                            warningAlert.setHeaderText("Assignment Limit Exceeded");
+                            warningAlert.setContentText("This teacher currently has " + uniqueSubjectCount + " unique subjects assigned, " +
+                                                       "which exceeds the maximum limit of 8.\n\n" +
+                                                       "Please use 'Clear All' to remove all assignments, then reassign subjects (maximum 8).");
+                            warningAlert.showAndWait();
+                        });
+                    }
+                } catch (Exception e) {
+                    // Ignore - just load assignments normally
+                }
+                Platform.runLater(() -> loadTeacherAssignments());
+            }).start();
         }
     }
     
@@ -533,27 +588,90 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
         }
     }
     
+    private void updateSubjectsByGrade() {
+        if (allSubjects == null || allSubjects.isEmpty()) {
+            return; // Subjects not loaded yet
+        }
+        
+        Integer selectedGrade = gradeComboBox.getValue();
+        
+        // Filter subjects by grade level
+        ObservableList<Subject> filtered;
+        if (selectedGrade != null) {
+            // Only show subjects for the selected grade
+            filtered = FXCollections.observableArrayList(
+                allSubjects.stream()
+                    .filter(s -> s.getGradeLevel() != null && s.getGradeLevel().equals(selectedGrade))
+                    .collect(Collectors.toList())
+            );
+        } else {
+            // If no grade selected, show all subjects
+            filtered = allSubjects;
+        }
+        
+        // Preserve current selection if it's still valid
+        Subject currentSelection = subjectComboBox.getValue();
+        subjectComboBox.setItems(filtered);
+        
+        // Restore selection if it's still in the filtered list
+        if (currentSelection != null && filtered.contains(currentSelection)) {
+            subjectComboBox.setValue(currentSelection);
+        } else {
+            subjectComboBox.setValue(null);
+        }
+    }
+    
     private void loadTeacherAssignments() {
         if (teacher == null) {
             return;
         }
         
         try {
-            // Load teacher's subjects and sections
-            List<Subject> teacherSubjects = teacherService.getTeacherSubjects(teacher.getId());
-            List<Section> teacherSections = teacherService.getTeacherSections(teacher.getId());
+            // Load ONLY actual assignments from TeacherAssignment table - NO backward compatibility
+            java.util.Map<Long, List<Section>> subjectSectionMap = teacherService.getSubjectSectionMap(teacher.getId());
             
-            // Create assignment records (combine subjects with sections)
-            // For simplicity, we'll show all subject-section combinations
-            // In a real scenario, you might want a more specific assignment model
             assignments.clear();
             
-            // Create assignment records
-            // For each subject-section combination, create an assignment record
-            // This is a simplified view - in reality you might want a TeacherAssignment entity
-            for (Subject subject : teacherSubjects) {
-                for (Section section : teacherSections) {
-                    assignments.add(new AssignmentRecord(subject, section));
+            // Only load from actual assignments - no fallback to old ManyToMany relationships
+            if (!subjectSectionMap.isEmpty()) {
+                // Load all subjects if not already loaded
+                if (allSubjects == null || allSubjects.isEmpty()) {
+                    loadSubjects();
+                    // Wait a bit for subjects to load
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+                
+                for (Map.Entry<Long, List<Section>> entry : subjectSectionMap.entrySet()) {
+                    Long subjectId = entry.getKey();
+                    List<Section> sections = entry.getValue();
+                    
+                    // Find the subject from allSubjects or load it
+                    Subject subject = null;
+                    if (allSubjects != null && !allSubjects.isEmpty()) {
+                        subject = allSubjects.stream()
+                            .filter(s -> s.getId().equals(subjectId))
+                            .findFirst()
+                            .orElse(null);
+                    }
+                    
+                    // If not found in allSubjects, load directly
+                    if (subject == null) {
+                        try {
+                            subject = subjectService.getSubjectRepository().findById(subjectId).orElse(null);
+                        } catch (Exception e) {
+                            // Ignore
+                        }
+                    }
+                    
+                    if (subject != null) {
+                        for (Section section : sections) {
+                            assignments.add(new AssignmentRecord(subject, section));
+                        }
+                    }
                 }
             }
             
@@ -568,6 +686,11 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
     private void updateAssignmentsCount() {
         int count = assignments.size();
         assignmentsCountLabel.setText("Total Assignments: " + count);
+        
+        // Enable/disable Clear All button based on assignment count
+        if (clearAllButton != null) {
+            clearAllButton.setDisable(count == 0);
+        }
     }
     
     private void handleAddSubject() {
@@ -781,18 +904,93 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
             return;
         }
         
-        // Check if this assignment already exists
-        boolean alreadyExists = assignments.stream()
+        // Validate grade level match: Subject grade must match section grade
+        Integer subjectGrade = selectedSubject.getGradeLevel();
+        Integer sectionGrade = selectedSection.getGradeLevel();
+        
+        if (subjectGrade == null || sectionGrade == null) {
+            showError("Both subject and section must have a grade level assigned");
+            return;
+        }
+        
+        if (!subjectGrade.equals(sectionGrade)) {
+            showError("Grade level mismatch: Subject is for Grade " + subjectGrade + 
+                     " but Section is for Grade " + sectionGrade + 
+                     ". Subjects can only be assigned to sections with the same grade level.");
+            return;
+        }
+        
+        // Validate that entities have IDs (required for database operations)
+        if (selectedSubject.getId() == null) {
+            showError("Invalid subject: Subject does not have an ID. Please select a valid subject from the list.");
+            return;
+        }
+        
+        if (selectedSection.getId() == null) {
+            showError("Invalid section: Section does not have an ID. Please select a valid section from the list.");
+            return;
+        }
+        
+        // Check if this exact assignment (same subject + same section) already exists
+        boolean exactAssignmentExists = assignments.stream()
             .anyMatch(a -> a.getSubject().getId().equals(selectedSubject.getId()) &&
                           a.getSection().getId().equals(selectedSection.getId()));
         
-        if (alreadyExists) {
-            showError("This assignment already exists");
+        if (exactAssignmentExists) {
+            showError("This subject is already assigned to this section. " +
+                     "You cannot assign the same subject to the same section twice.");
+            return;
+        }
+        
+        // Check maximum 8 unique subjects before adding
+        // First, check against database to get current count
+        long currentUniqueSubjectCount = 0;
+        try {
+            currentUniqueSubjectCount = teacherService.getUniqueSubjectCount(teacher.getId());
+        } catch (Exception e) {
+            // If database check fails, fall back to local list check
+            Set<Long> currentSubjectIds = assignments.stream()
+                .map(a -> a.getSubject().getId())
+                .collect(Collectors.toSet());
+            currentUniqueSubjectCount = currentSubjectIds.size();
+        }
+        
+        // Check if the new subject is already in the current assignments
+        boolean isNewSubject = assignments.stream()
+            .noneMatch(a -> a.getSubject().getId().equals(selectedSubject.getId()));
+        
+        // If it's a new subject, increment the count
+        if (isNewSubject) {
+            currentUniqueSubjectCount++;
+        }
+        
+        if (currentUniqueSubjectCount > 8) {
+            showError("A teacher can have a maximum of 8 unique subjects. " +
+                     "Current unique subjects: " + (isNewSubject ? currentUniqueSubjectCount - 1 : currentUniqueSubjectCount) + 
+                     ". Cannot add more. " +
+                     "(Note: The same subject can be assigned to multiple sections, but total unique subjects cannot exceed 8)");
+            return;
+        }
+        
+        // Validate the entities one more time before creating the record
+        if (selectedSubject.getId() == null) {
+            showError("Cannot assign: Subject does not have a valid ID. Please select a different subject.");
+            return;
+        }
+        if (selectedSection.getId() == null) {
+            showError("Cannot assign: Section does not have a valid ID. Please select a different section.");
             return;
         }
         
         // Add to local list first (optimistic update)
         AssignmentRecord newRecord = new AssignmentRecord(selectedSubject, selectedSection);
+        
+        // Validate the record was created properly
+        if (newRecord.getSubject() == null || newRecord.getSection() == null) {
+            showError("Error creating assignment record. Please try again.");
+            return;
+        }
+        
         assignments.add(newRecord);
         updateAssignmentsCount();
         
@@ -806,7 +1004,11 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
         saveAssignments();
     }
     
-    private void handleRemoveAssignment(AssignmentRecord record) {
+    private void handleRemoveAssignment(AssignmentRecord record, int index) {
+        if (record == null) {
+            return;
+        }
+        
         Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
         confirmAlert.setTitle("Remove Assignment");
         confirmAlert.setHeaderText("Remove Assignment");
@@ -816,7 +1018,39 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
         
         confirmAlert.showAndWait().ifPresent(response -> {
             if (response == ButtonType.OK) {
-                assignments.remove(record);
+                // Remove by index to ensure proper removal
+                if (index >= 0 && index < assignments.size()) {
+                    assignments.remove(index);
+                } else {
+                    // Fallback: remove by matching IDs
+                    assignments.removeIf(a -> 
+                        a.getSubject().getId().equals(record.getSubject().getId()) &&
+                        a.getSection().getId().equals(record.getSection().getId())
+                    );
+                }
+                updateAssignmentsCount();
+                saveAssignments();
+            }
+        });
+    }
+    
+    private void handleClearAllAssignments() {
+        if (assignments == null || assignments.isEmpty()) {
+            showError("No assignments to clear.");
+            return;
+        }
+        
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Clear All Assignments");
+        confirmAlert.setHeaderText("Clear All Assignments");
+        confirmAlert.setContentText("Are you sure you want to remove ALL assigned subjects for this teacher?\n\n" +
+                                   "This will remove " + assignments.size() + " assignment(s).\n" +
+                                   "This action cannot be undone.");
+        
+        confirmAlert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                // Clear all assignments
+                assignments.clear();
                 updateAssignmentsCount();
                 saveAssignments();
             }
@@ -846,25 +1080,8 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                 for (int attempt = 0; attempt < maxRetries; attempt++) {
                     try {
                         transactionTemplate.execute(status -> {
-                            // Get unique subjects and sections from assignments
-                            Set<Long> subjectIds = assignments.stream()
-                                .map(a -> a.getSubject().getId())
-                                .collect(Collectors.toSet());
-                            
-                            Set<Long> sectionIds = assignments.stream()
-                                .map(a -> a.getSection().getId())
-                                .collect(Collectors.toSet());
-                            
-                            // Validate maximum 8 subjects
-                            if (subjectIds.size() > 8) {
-                                throw new RuntimeException("A teacher can have a maximum of 8 subjects");
-                            }
-                            
-                            // Assign subjects
-                            teacherService.assignSubjects(teacher.getId(), new ArrayList<>(subjectIds));
-                            
-                            // Assign sections
-                            teacherService.assignSections(teacher.getId(), new ArrayList<>(sectionIds));
+                            // Save actual assignments (subject-section pairs)
+                            teacherService.saveTeacherAssignments(teacher.getId(), new ArrayList<>(assignments));
                             
                             return null;
                         });
@@ -908,14 +1125,43 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                 Platform.runLater(() -> {
                     assignButton.setDisable(false);
                     assignButton.setText("Assign");
+                    // Reload assignments to ensure UI is in sync
+                    loadTeacherAssignments();
+                    // Show success message
+                    Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                    successAlert.setTitle("Success");
+                    successAlert.setHeaderText("Assignments Saved Successfully");
+                    successAlert.setContentText("The teacher's subject and section assignments have been saved. " +
+                                                  "The teacher dashboard will reflect these changes when refreshed.");
+                    successAlert.showAndWait();
                 });
                 
             } catch (Exception e) {
                 e.printStackTrace();
+                String errorMessage = e.getMessage();
+                final String detailedError;
+                
+                // Provide more helpful error messages
+                if (errorMessage != null) {
+                    if (errorMessage.contains("maximum of 8")) {
+                        detailedError = errorMessage;
+                    } else if (errorMessage.contains("not found")) {
+                        detailedError = "Error: " + errorMessage + "\n\nPlease ensure all subjects and sections exist in the database.";
+                    } else if (errorMessage.contains("null")) {
+                        detailedError = "Error: Invalid assignment data. " + errorMessage + "\n\nPlease try removing and re-adding the assignment.";
+                    } else if (errorMessage.contains("SQLITE") || errorMessage.contains("database")) {
+                        detailedError = "Database error: " + errorMessage + "\n\nPlease try again. If the problem persists, restart the application.";
+                    } else {
+                        detailedError = "Error saving assignments: " + errorMessage;
+                    }
+                } else {
+                    detailedError = "An unknown error occurred while saving assignments. Please try again.";
+                }
+                
                 Platform.runLater(() -> {
                     assignButton.setDisable(false);
                     assignButton.setText("Assign");
-                    showError("Error saving assignments: " + e.getMessage());
+                    showError(detailedError);
                     // Reload assignments to sync with database
                     loadTeacherAssignments();
                 });

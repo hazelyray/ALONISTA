@@ -57,8 +57,25 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired(required = false)
     private com.enrollment.system.repository.SubjectRepository subjectRepository;
     
+    @Autowired(required = false)
+    private com.enrollment.system.service.TeacherService teacherService;
+    
+    @Autowired(required = false)
+    private com.enrollment.system.util.DatabaseSchemaFixer databaseSchemaFixer;
+    
     @Override
     public void run(String... args) throws Exception {
+        // Clear all teacher assignments to fix database conflicts
+        try {
+            if (teacherService != null) {
+                teacherService.clearAllTeacherAssignments();
+                System.out.println("✓ Cleared all teacher assignments from database");
+            }
+        } catch (Exception e) {
+            System.err.println("⚠ Warning: Could not clear teacher assignments: " + e.getMessage());
+            // Continue - don't block application startup
+        }
+        
         // Update database schema if needed (e.g., add TEACHER role support)
         if (databaseSchemaUpdater != null) {
             try {
@@ -66,6 +83,45 @@ public class DataInitializer implements CommandLineRunner {
             } catch (Exception e) {
                 System.err.println("⚠ Warning: Could not update database schema: " + e.getMessage());
                 // Continue - don't block application startup
+            }
+            
+            // Ensure teacher_assignments table exists with correct schema
+            try {
+                databaseSchemaUpdater.ensureTeacherAssignmentsTableExists();
+            } catch (Exception e) {
+                System.err.println("⚠ Warning: Could not verify teacher_assignments table: " + e.getMessage());
+                // Try force fix as last resort
+                try {
+                    System.out.println("🔄 Attempting force fix...");
+                    databaseSchemaUpdater.forceFixTeacherAssignmentsTable();
+                } catch (Exception e2) {
+                    System.err.println("⚠ Warning: Force fix also failed: " + e2.getMessage());
+                }
+            }
+        }
+        
+        // Comprehensive schema scan and fix
+        if (databaseSchemaFixer != null) {
+            try {
+                // First scan to detect issues
+                databaseSchemaFixer.scanAndFixTeacherAssignmentsTable();
+                
+                // If scan didn't fix it, force fix as backup
+                // (This ensures the table is always correct)
+                try {
+                    databaseSchemaFixer.forceFixTeacherAssignmentsTable();
+                } catch (Exception e2) {
+                    System.err.println("⚠ Warning: Force fix failed: " + e2.getMessage());
+                }
+            } catch (Exception e) {
+                System.err.println("⚠ Warning: Schema scan/fix failed: " + e.getMessage());
+                // Try force fix as last resort
+                try {
+                    System.out.println("🔄 Attempting force fix as last resort...");
+                    databaseSchemaFixer.forceFixTeacherAssignmentsTable();
+                } catch (Exception e2) {
+                    System.err.println("⚠ Warning: Force fix also failed: " + e2.getMessage());
+                }
             }
         }
         

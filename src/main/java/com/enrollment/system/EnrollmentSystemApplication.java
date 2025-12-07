@@ -21,7 +21,7 @@ public class EnrollmentSystemApplication extends Application {
     @Override
     public void start(Stage primaryStage) throws Exception {
         // Load FXML with Spring
-        FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/Login.fxml"));
+        FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/login.fxml"));
         loader.setControllerFactory(applicationContext::getBean);
         
         Parent root = loader.load();

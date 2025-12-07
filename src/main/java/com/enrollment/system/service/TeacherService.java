@@ -4,9 +4,11 @@ import com.enrollment.system.dto.UserDto;
 import com.enrollment.system.model.User;
 import com.enrollment.system.model.Subject;
 import com.enrollment.system.model.Section;
+import com.enrollment.system.model.TeacherAssignment;
 import com.enrollment.system.repository.UserRepository;
 import com.enrollment.system.repository.SubjectRepository;
 import com.enrollment.system.repository.SectionRepository;
+import com.enrollment.system.repository.TeacherAssignmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +34,9 @@ public class TeacherService {
     
     @Autowired
     private SectionRepository sectionRepository;
+    
+    @Autowired
+    private TeacherAssignmentRepository teacherAssignmentRepository;
     
     @Transactional(readOnly = true)
     public List<UserDto> getAllTeachers() {
@@ -215,6 +222,131 @@ public class TeacherService {
         teacher.getSections().size();
         
         return sections;
+    }
+    
+    @Transactional(readOnly = true)
+    public long getUniqueSubjectCount(Long teacherId) {
+        return teacherAssignmentRepository.countDistinctSubjectsByTeacherId(teacherId);
+    }
+    
+    @Transactional(readOnly = true)
+    public Map<Long, List<Section>> getSubjectSectionMap(Long teacherId) {
+        List<TeacherAssignment> assignments = teacherAssignmentRepository.findByTeacherId(teacherId);
+        
+        Map<Long, List<Section>> subjectSectionMap = new HashMap<>();
+        
+        for (TeacherAssignment assignment : assignments) {
+            // Access entities to trigger lazy loading within transaction
+            Subject subject = assignment.getSubject();
+            Section section = assignment.getSection();
+            
+            if (subject != null && subject.getId() != null && section != null) {
+                Long subjectId = subject.getId();
+                subjectSectionMap.computeIfAbsent(subjectId, k -> new java.util.ArrayList<>()).add(section);
+            }
+        }
+        
+        return subjectSectionMap;
+    }
+    
+    @Transactional
+    public void saveTeacherAssignments(Long teacherId, List<com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord> assignments) {
+        // Validate teacher exists
+        User teacher = userRepository.findById(teacherId)
+                .filter(user -> user.getRole() == User.UserRole.TEACHER)
+                .orElseThrow(() -> new RuntimeException("Teacher not found with id: " + teacherId));
+        
+        // Delete all existing assignments for this teacher first
+        teacherAssignmentRepository.deleteByTeacherId(teacherId);
+        
+        // If no assignments to save, we're done
+        if (assignments == null || assignments.isEmpty()) {
+            return;
+        }
+        
+        // Extract and validate IDs
+        List<Long> subjectIds = assignments.stream()
+                .map(a -> {
+                    if (a.getSubject() == null || a.getSubject().getId() == null) {
+                        throw new RuntimeException("Invalid assignment: subject is null or has no ID");
+                    }
+                    return a.getSubject().getId();
+                })
+                .distinct()
+                .collect(Collectors.toList());
+        
+        List<Long> sectionIds = assignments.stream()
+                .map(a -> {
+                    if (a.getSection() == null || a.getSection().getId() == null) {
+                        throw new RuntimeException("Invalid assignment: section is null or has no ID");
+                    }
+                    return a.getSection().getId();
+                })
+                .distinct()
+                .collect(Collectors.toList());
+        
+        // Validate maximum 8 unique subjects
+        if (subjectIds.size() > 8) {
+            throw new RuntimeException("A teacher can have a maximum of 8 unique subjects. Found: " + subjectIds.size());
+        }
+        
+        // Fetch all subjects and sections fresh from database
+        List<Subject> subjects = subjectRepository.findAllById(subjectIds);
+        if (subjects.size() != subjectIds.size()) {
+            throw new RuntimeException("One or more subjects not found in database");
+        }
+        
+        List<Section> sections = sectionRepository.findAllById(sectionIds);
+        if (sections.size() != sectionIds.size()) {
+            throw new RuntimeException("One or more sections not found in database");
+        }
+        
+        // Create a map for quick lookup
+        Map<Long, Subject> subjectMap = subjects.stream()
+                .collect(Collectors.toMap(Subject::getId, s -> s));
+        Map<Long, Section> sectionMap = sections.stream()
+                .collect(Collectors.toMap(Section::getId, s -> s));
+        
+        // Create and save new assignments using fresh entities from database
+        for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : assignments) {
+            Long subjectId = assignmentRecord.getSubject().getId();
+            Long sectionId = assignmentRecord.getSection().getId();
+            
+            // Get fresh entities from database
+            Subject subject = subjectMap.get(subjectId);
+            Section section = sectionMap.get(sectionId);
+            
+            if (subject == null) {
+                throw new RuntimeException("Subject not found with id: " + subjectId);
+            }
+            if (section == null) {
+                throw new RuntimeException("Section not found with id: " + sectionId);
+            }
+            
+            // Create new assignment with fresh managed entities
+            TeacherAssignment assignment = new TeacherAssignment(teacher, subject, section);
+            teacherAssignmentRepository.save(assignment);
+        }
+    }
+    
+    @Transactional
+    public void clearAllTeacherAssignments() {
+        teacherAssignmentRepository.deleteAll();
+    }
+    
+    @Transactional
+    public void clearTeacherAssignments(Long teacherId) {
+        teacherAssignmentRepository.deleteByTeacherId(teacherId);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<Section> getSectionsForSubject(Long teacherId, Long subjectId) {
+        List<TeacherAssignment> assignments = teacherAssignmentRepository.findByTeacherIdAndSubjectId(teacherId, subjectId);
+        
+        return assignments.stream()
+                .map(TeacherAssignment::getSection)
+                .filter(section -> section != null) // Filter out null sections
+                .collect(Collectors.toList());
     }
 }
 

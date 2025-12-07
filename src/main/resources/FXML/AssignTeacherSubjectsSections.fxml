@@ -32,8 +32,13 @@
                         <TableColumn fx:id="actionsColumn" text="Actions" prefWidth="100"/>
                     </columns>
                 </TableView>
-                <Label fx:id="assignmentsCountLabel" text="Total Assignments: 0" 
-                       style="-fx-font-size: 12px; -fx-text-fill: #7f8c8d;"/>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label fx:id="assignmentsCountLabel" text="Total Assignments: 0" 
+                           style="-fx-font-size: 12px; -fx-text-fill: #7f8c8d;"/>
+                    <Region HBox.hgrow="ALWAYS"/>
+                    <Button fx:id="clearAllButton" text="Clear All" 
+                            style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 11px; -fx-background-radius: 5; -fx-padding: 5 15; -fx-cursor: hand;"/>
+                </HBox>
             </VBox>
             
             <!-- Right Side: Add New Assignment Form -->
