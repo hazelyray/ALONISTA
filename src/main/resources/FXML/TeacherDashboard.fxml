@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" 
+            xmlns:fx="http://javafx.com/fxml/1" 
+            fx:controller="com.enrollment.system.controller.TeacherDashboardController"
+            style="-fx-background-color: #ecf0f1;">
+    
+    <!-- Top Header -->
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="20" 
+              style="-fx-background-color: #2c3e50; -fx-padding: 15 30;">
+            <HBox spacing="10" HBox.hgrow="ALWAYS">
+                <Label fx:id="userNameLabel" text="Welcome, User" 
+                       style="-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;"/>
+                <Label fx:id="userRoleLabel" text="(Role)" 
+                       style="-fx-text-fill: #bdc3c7; -fx-font-size: 14px;"/>
+            </HBox>
+        </HBox>
+    </top>
+    
+    <!-- Left Sidebar -->
+    <left>
+        <VBox spacing="8" style="-fx-background-color: #2c3e50; -fx-padding: 0;" prefWidth="280">
+            <!-- Logo/Header Section -->
+            <VBox alignment="CENTER" spacing="5" style="-fx-padding: 25 15 30 15; -fx-background-color: #1a252f;">
+                <Label text="📚" style="-fx-font-size: 36px;"/>
+                <Label text="Seguinon SASHS" style="-fx-text-fill: white; -fx-font-size: 18px; -fx-font-weight: bold;"/>
+                <Label text="Enrollment System" style="-fx-text-fill: #95a5a6; -fx-font-size: 12px;"/>
+            </VBox>
+            
+            <!-- Menu Section -->
+            <VBox spacing="3" style="-fx-padding: 0 15;">
+                <Label text="MAIN MENU" style="-fx-text-fill: #7f8c8d; -fx-font-size: 11px; -fx-font-weight: bold; -fx-padding: 15 15 10 15;"/>
+                
+                <Button fx:id="btnDashboard" text="  📊 Dashboard" onAction="#showDashboard"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
+                
+                <Button fx:id="btnMySubjects" text="  📚 My Subjects" onAction="#showMySubjects"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
+                
+                <Button fx:id="btnMyStudents" text="  👥 My Students" onAction="#showMyStudents"
+                        style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
+            </VBox>
+            
+            <!-- Spacer -->
+            <Region VBox.vgrow="ALWAYS"/>
+            
+            <!-- Logout Button -->
+            <VBox alignment="CENTER" spacing="10" style="-fx-padding: 20 15;">
+                <Button fx:id="logoutButton" text="🚪 Logout" onAction="#handleLogout"
+                        style="-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-background-radius: 8; -fx-padding: 12 30; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(231,76,60,0.3), 8, 0, 0, 2);"/>
+            </VBox>
+            
+            <!-- Footer -->
+            <VBox alignment="CENTER" spacing="5" style="-fx-padding: 20 15; -fx-background-color: #1a252f;">
+                <Label text="Version 1.0" style="-fx-text-fill: #7f8c8d; -fx-font-size: 10px;"/>
+            </VBox>
+        </VBox>
+    </left>
+    
+    <!-- Center Content -->
+    <center>
+        <VBox fx:id="dashboardContent" spacing="20" style="-fx-padding: 30;">
+            <!-- Empty content area - will be populated by page methods -->
+        </VBox>
+    </center>
+    
+</BorderPane>
+

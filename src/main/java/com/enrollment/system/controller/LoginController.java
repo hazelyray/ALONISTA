@@ -200,22 +200,45 @@ public class LoginController {
     
     private void loadDashboard(LoginResponse response) {
         try {
+            // Check user role and load appropriate dashboard
+            String userRole = response.getUser().getRole();
+            String fxmlPath;
+            String stageTitle;
+            
+            if ("TEACHER".equals(userRole)) {
+                fxmlPath = "/FXML/TeacherDashboard.fxml";
+                stageTitle = "Seguinon SASHS Enrollment System - Teacher Dashboard";
+            } else {
+                fxmlPath = "/FXML/Dashboard.fxml";
+                stageTitle = "Seguinon SASHS Enrollment System - Dashboard";
+            }
+            
             // Load Dashboard FXML
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/Dashboard.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource(fxmlPath));
             loader.setControllerFactory(applicationContext::getBean);
             
             // Load the FXML - this will call initialize()
             Parent dashboardRoot = loader.load();
             
             // Get dashboard controller and set user session
-            DashboardController dashboardController = loader.getController();
-            if (dashboardController != null) {
-                dashboardController.setUserSession(response.getUser(), response.getSessionToken());
+            Object dashboardController = loader.getController();
+            
+            if ("TEACHER".equals(userRole)) {
+                com.enrollment.system.controller.TeacherDashboardController teacherController = 
+                    (com.enrollment.system.controller.TeacherDashboardController) dashboardController;
+                if (teacherController != null) {
+                    teacherController.setUserSession(response.getUser(), response.getSessionToken());
+                }
+            } else {
+                DashboardController adminController = (DashboardController) dashboardController;
+                if (adminController != null) {
+                    adminController.setUserSession(response.getUser(), response.getSessionToken());
+                }
             }
             
             // Create new stage for dashboard
             Stage dashboardStage = new Stage();
-            dashboardStage.setTitle("Seguinon SASHS Enrollment System - Dashboard");
+            dashboardStage.setTitle(stageTitle);
             dashboardStage.setScene(new Scene(dashboardRoot));
             dashboardStage.setMaximized(true);
             
@@ -224,8 +247,17 @@ public class LoginController {
             loginStage.hide();
             
             // Store login stage reference in dashboard controller
-            if (dashboardController != null) {
-                dashboardController.setLoginStage(loginStage);
+            if ("TEACHER".equals(userRole)) {
+                com.enrollment.system.controller.TeacherDashboardController teacherController = 
+                    (com.enrollment.system.controller.TeacherDashboardController) dashboardController;
+                if (teacherController != null) {
+                    teacherController.setLoginStage(loginStage);
+                }
+            } else {
+                DashboardController adminController = (DashboardController) dashboardController;
+                if (adminController != null) {
+                    adminController.setLoginStage(loginStage);
+                }
             }
             
             // Set dashboard to show login when closed via X button

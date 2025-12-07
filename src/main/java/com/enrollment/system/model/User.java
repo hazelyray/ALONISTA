@@ -2,6 +2,8 @@ package com.enrollment.system.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -17,7 +19,7 @@ public class User {
     @Column(nullable = false)
     private String password; // Will be hashed
     
-    @Column(nullable = false, length = 100)
+    @Column(name = "full_name", nullable = false, length = 100)
     private String fullName;
     
     @Column(length = 100)
@@ -27,7 +29,7 @@ public class User {
     @Column(nullable = false)
     private UserRole role;
     
-    @Column(nullable = false)
+    @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
     
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -38,6 +40,23 @@ public class User {
     
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
+    
+    // Teacher assignments (only for TEACHER role)
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "teacher_subjects",
+        joinColumns = @JoinColumn(name = "teacher_id"),
+        inverseJoinColumns = @JoinColumn(name = "subject_id")
+    )
+    private Set<Subject> subjects = new HashSet<>();
+    
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "teacher_sections",
+        joinColumns = @JoinColumn(name = "teacher_id"),
+        inverseJoinColumns = @JoinColumn(name = "section_id")
+    )
+    private Set<Section> sections = new HashSet<>();
     
     // Constructors
     public User() {
@@ -139,6 +158,22 @@ public class User {
         this.lastLogin = lastLogin;
     }
     
+    public Set<Subject> getSubjects() {
+        return subjects;
+    }
+    
+    public void setSubjects(Set<Subject> subjects) {
+        this.subjects = subjects;
+    }
+    
+    public Set<Section> getSections() {
+        return sections;
+    }
+    
+    public void setSections(Set<Section> sections) {
+        this.sections = sections;
+    }
+    
     // JPA Lifecycle callbacks
     @PrePersist
     protected void onCreate() {
@@ -155,7 +190,8 @@ public class User {
     public enum UserRole {
         ADMIN("Administrator"),
         REGISTRAR("Registrar"),
-        STAFF("Staff");
+        STAFF("Staff"),
+        TEACHER("Teacher");
         
         private final String displayName;
         

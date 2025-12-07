@@ -12,6 +12,7 @@ import com.enrollment.system.repository.SemesterRepository;
 import com.enrollment.system.repository.StudentRepository;
 import com.enrollment.system.repository.StrandRepository;
 import com.enrollment.system.repository.UserRepository;
+import com.enrollment.system.util.DatabaseSchemaUpdater;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,8 +51,24 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired(required = false)
     private com.enrollment.system.service.StudentService studentService;
     
+    @Autowired(required = false)
+    private DatabaseSchemaUpdater databaseSchemaUpdater;
+    
+    @Autowired(required = false)
+    private com.enrollment.system.repository.SubjectRepository subjectRepository;
+    
     @Override
     public void run(String... args) throws Exception {
+        // Update database schema if needed (e.g., add TEACHER role support)
+        if (databaseSchemaUpdater != null) {
+            try {
+                databaseSchemaUpdater.updateUsersTableForTeacherRole();
+            } catch (Exception e) {
+                System.err.println("⚠ Warning: Could not update database schema: " + e.getMessage());
+                // Continue - don't block application startup
+            }
+        }
+        
         // Create default admin user if not exists
         if (!userRepository.existsByUsername("admin")) {
             User admin = new User();
@@ -101,6 +118,14 @@ public class DataInitializer implements CommandLineRunner {
             initializeSections();
         } catch (Exception e) {
             System.err.println("⚠ Warning: Failed to initialize sections: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        // Initialize subjects (sample subjects for Grade 11 and Grade 12)
+        try {
+            initializeSubjects();
+        } catch (Exception e) {
+            System.err.println("⚠ Warning: Failed to initialize subjects: " + e.getMessage());
             e.printStackTrace();
         }
         
@@ -1122,5 +1147,82 @@ public class DataInitializer implements CommandLineRunner {
         System.out.println("  - All students have unique full names");
         System.out.println("  - ABM and GAS sections: 40 students each");
         System.out.println("  - Other strand sections: 10 students each");
+    }
+    
+    private void initializeSubjects() {
+        if (subjectRepository == null) {
+            System.out.println("⚠ SubjectRepository not available - skipping subject initialization");
+            return;
+        }
+        
+        // Grade 11 Subjects
+        String[] grade11Subjects = {
+            "Oral Communication",
+            "Komunikasyon at Pananaliksik sa Wika at Kulturang Pilipino",
+            "21st Century Literature from the Philippines and the World",
+            "Contemporary Philippine Arts from the Regions",
+            "Media and Information Literacy",
+            "General Mathematics",
+            "Statistics and Probability",
+            "Earth and Life Science",
+            "Physical Science",
+            "Personal Development",
+            "Understanding Culture, Society and Politics",
+            "Introduction to the Philosophy of the Human Person",
+            "Physical Education and Health",
+            "Reading and Writing Skills"
+        };
+        
+        // Grade 12 Subjects
+        String[] grade12Subjects = {
+            "Creative Writing",
+            "Creative Nonfiction",
+            "World Literature",
+            "Philippine Literature",
+            "Research in Daily Life 1",
+            "Research in Daily Life 2",
+            "Practical Research 1",
+            "Practical Research 2",
+            "Disaster Readiness and Risk Reduction",
+            "Earth Science",
+            "Physical Education and Health",
+            "Empowerment Technologies",
+            "Entrepreneurship",
+            "Inquiries, Investigations and Immersion"
+        };
+        
+        int subjectsCreated = 0;
+        
+        // Create Grade 11 subjects
+        for (String subjectName : grade11Subjects) {
+            if (!subjectRepository.existsByNameAndGradeLevel(subjectName, 11)) {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(11);
+                subject.setIsActive(true);
+                subject.setIsCustom(false); // Default subjects are not custom
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create Grade 12 subjects
+        for (String subjectName : grade12Subjects) {
+            if (!subjectRepository.existsByNameAndGradeLevel(subjectName, 12)) {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(12);
+                subject.setIsActive(true);
+                subject.setIsCustom(false); // Default subjects are not custom
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        if (subjectsCreated > 0) {
+            System.out.println("✓ Created " + subjectsCreated + " sample subjects (Grade 11 and Grade 12)");
+        } else {
+            System.out.println("✓ Subjects already exist in database");
+        }
     }
 }

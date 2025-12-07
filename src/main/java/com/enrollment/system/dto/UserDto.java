@@ -8,6 +8,7 @@ public class UserDto {
     
     private Long id;
     private String username;
+    private String password; // For creating/updating users
     private String fullName;
     private String email;
     private String role;
@@ -60,6 +61,14 @@ public class UserDto {
     
     public void setUsername(String username) {
         this.username = username;
+    }
+    
+    public String getPassword() {
+        return password;
+    }
+    
+    public void setPassword(String password) {
+        this.password = password;
     }
     
     public String getFullName() {

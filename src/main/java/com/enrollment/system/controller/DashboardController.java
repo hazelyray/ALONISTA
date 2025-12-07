@@ -77,6 +77,9 @@ public class DashboardController {
     private Button btnProfile;
     
     @FXML
+    private Button btnTeacherAccountManagement;
+    
+    @FXML
     private Button btnSchoolYearManagement;
     
     @FXML
@@ -170,6 +173,7 @@ public class DashboardController {
             setupSubmenuButtonHover(btnArchiveStudents, "#95a5a6");
             setupSubmenuButtonHover(btnUserAccounts, "#3498db");
             setupSubmenuButtonHover(btnProfile, "#3498db");
+            setupSubmenuButtonHover(btnTeacherAccountManagement, "#9b59b6");
             setupSubmenuButtonHover(btnSchoolYearManagement, "#16a085");
         } catch (Exception e) {
             System.err.println("Warning: Error setting up submenu button hover effects: " + e.getMessage());
@@ -676,6 +680,52 @@ public class DashboardController {
     }
     
     @FXML
+    private void showTeacherAccountManagement() {
+        resetSubmenuButtonStyles();
+        if (btnTeacherAccountManagement != null) {
+            btnTeacherAccountManagement.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 10 16; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 200;");
+        }
+        
+        try {
+            // Load Teacher Account Management FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/TeacherAccountManagement.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent teacherAccountManagementRoot = loader.load();
+            
+            // Create new stage for Teacher Account Management
+            Stage teacherAccountManagementStage = new Stage();
+            teacherAccountManagementStage.setTitle("Teacher Account Management - Seguinon SHS Enrollment System");
+            teacherAccountManagementStage.setScene(new Scene(teacherAccountManagementRoot));
+            teacherAccountManagementStage.setWidth(1200);
+            teacherAccountManagementStage.setHeight(800);
+            teacherAccountManagementStage.setResizable(true);
+            
+            // Set owner to dashboard stage
+            Stage dashboardStage = (Stage) (btnTeacherAccountManagement != null ? btnTeacherAccountManagement.getScene().getWindow() : btnSettings.getScene().getWindow());
+            teacherAccountManagementStage.initOwner(dashboardStage);
+            
+            // Refresh data when window is shown
+            teacherAccountManagementStage.setOnShown(e -> {
+                TeacherAccountManagementController controller = loader.getController();
+                if (controller != null) {
+                    controller.refreshData();
+                }
+            });
+            
+            // Show Teacher Account Management window
+            teacherAccountManagementStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load Teacher Account Management page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
+    }
+    
+    @FXML
     private void showSchoolYearManagement() {
         resetSubmenuButtonStyles();
         if (btnSchoolYearManagement != null) {
@@ -863,6 +913,7 @@ public class DashboardController {
         if (btnEnrollmentSummary != null) btnEnrollmentSummary.setStyle(defaultStyle);
         if (btnUserAccounts != null) btnUserAccounts.setStyle(defaultStyle);
         if (btnProfile != null) btnProfile.setStyle(nestedSubmenuStyle);
+        if (btnTeacherAccountManagement != null) btnTeacherAccountManagement.setStyle(nestedSubmenuStyle);
         if (btnSchoolYearManagement != null) btnSchoolYearManagement.setStyle(defaultStyle);
     }
 }
