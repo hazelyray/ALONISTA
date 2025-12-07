@@ -61,6 +61,11 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.ButtonType;
+import javafx.scene.chart.BarChart;
+import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.PieChart;
+import javafx.scene.chart.XYChart;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -128,6 +133,9 @@ public class TeacherDashboardController {
     
     @Autowired(required = false)
     private SubjectService subjectService;
+    
+    @Autowired(required = false)
+    private com.enrollment.system.repository.TeacherAssignmentRepository teacherAssignmentRepository;
     
     private UserDto currentUser;
     private String sessionToken;
@@ -524,7 +532,7 @@ public class TeacherDashboardController {
         // Dashboard Title and School Year
         HBox header = new HBox(15);
         header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(0, 0, 30, 0));
+        header.setPadding(new Insets(0, 0, 20, 0));
         
         Label dashboardTitle = new Label("Dashboard");
         dashboardTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
@@ -538,10 +546,10 @@ public class TeacherDashboardController {
         
         dashboardContent.getChildren().add(header);
         
-        // Summary Panel
+        // Summary Cards Row
         HBox summaryPanel = new HBox(20);
         summaryPanel.setAlignment(Pos.CENTER_LEFT);
-        summaryPanel.setPadding(new Insets(0, 0, 0, 0));
+        summaryPanel.setPadding(new Insets(0, 0, 20, 0));
         
         int totalSubjects = subjects.size();
         int totalSections = sections.size();
@@ -554,6 +562,394 @@ public class TeacherDashboardController {
         );
         
         dashboardContent.getChildren().add(summaryPanel);
+        
+        // Charts Grid - 2x2 layout to fit in one screen
+        GridPane chartsGrid = new GridPane();
+        chartsGrid.setHgap(15);
+        chartsGrid.setVgap(15);
+        chartsGrid.setPadding(new Insets(0, 0, 20, 0));
+        
+        // Chart 1: Male/Female Distribution (Pie Chart)
+        VBox genderChartContainer = createChartContainer("Students by Gender", createGenderChart(students));
+        genderChartContainer.setPrefWidth(380);
+        genderChartContainer.setPrefHeight(280);
+        chartsGrid.add(genderChartContainer, 0, 0);
+        
+        // Chart 2: Students by Grade Level (Bar Chart)
+        VBox gradeChartContainer = createChartContainer("Students by Grade Level", createGradeLevelChart(students));
+        gradeChartContainer.setPrefWidth(380);
+        gradeChartContainer.setPrefHeight(280);
+        chartsGrid.add(gradeChartContainer, 1, 0);
+        
+        // Chart 3: Students by Strand (Bar Chart)
+        VBox strandChartContainer = createChartContainer("Students by Strand", createStrandChart(students));
+        strandChartContainer.setPrefWidth(380);
+        strandChartContainer.setPrefHeight(280);
+        chartsGrid.add(strandChartContainer, 0, 1);
+        
+        // Chart 4: Students by Section (Bar Chart)
+        VBox sectionChartContainer = createChartContainer("Students by Section", createSectionChart(students, sections));
+        sectionChartContainer.setPrefWidth(380);
+        sectionChartContainer.setPrefHeight(280);
+        chartsGrid.add(sectionChartContainer, 1, 1);
+        
+        dashboardContent.getChildren().add(chartsGrid);
+    }
+    
+    private VBox createChartContainer(String title, javafx.scene.Node chart) {
+        VBox container = new VBox(10);
+        container.setPadding(new Insets(15));
+        container.setStyle(
+            "-fx-background-color: white; " +
+            "-fx-background-radius: 12; " +
+            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 8, 0, 0, 2);"
+        );
+        
+        Label titleLabel = new Label(title);
+        titleLabel.setStyle(
+            "-fx-font-size: 16px; " +
+            "-fx-font-weight: bold; " +
+            "-fx-text-fill: #2c3e50;"
+        );
+        
+        // Make chart fill available space
+        if (chart instanceof BarChart) {
+            ((BarChart<?, ?>) chart).setPrefHeight(220);
+        } else if (chart instanceof PieChart) {
+            ((PieChart) chart).setPrefHeight(220);
+        }
+        
+        container.getChildren().addAll(titleLabel, chart);
+        return container;
+    }
+    
+    private PieChart createGenderChart(List<StudentDto> students) {
+        PieChart chart = new PieChart();
+        chart.setLegendVisible(true);
+        chart.setAnimated(true);
+        chart.setLabelsVisible(true);
+        chart.setLabelLineLength(15);
+        
+        // Count male and female students
+        long maleCount = students.stream()
+            .filter(s -> "Male".equalsIgnoreCase(s.getSex()))
+            .count();
+        long femaleCount = students.stream()
+            .filter(s -> "Female".equalsIgnoreCase(s.getSex()))
+            .count();
+        
+        // Include count in label for visibility
+        PieChart.Data maleData = new PieChart.Data("Male (" + maleCount + ")", maleCount);
+        PieChart.Data femaleData = new PieChart.Data("Female (" + femaleCount + ")", femaleCount);
+        
+        chart.getData().addAll(maleData, femaleData);
+        
+        // Apply colors and make interactive
+        chart.getData().forEach(data -> {
+            String name = data.getName();
+            if (name.startsWith("Male")) {
+                data.getNode().setStyle("-fx-pie-color: #3498db;");
+            } else if (name.startsWith("Female")) {
+                data.getNode().setStyle("-fx-pie-color: #e91e63;");
+            }
+            
+            // Add hover effect
+            data.getNode().setOnMouseEntered(e -> {
+                data.getNode().setScaleX(1.05);
+                data.getNode().setScaleY(1.05);
+            });
+            data.getNode().setOnMouseExited(e -> {
+                data.getNode().setScaleX(1.0);
+                data.getNode().setScaleY(1.0);
+            });
+        });
+        
+        return chart;
+    }
+    
+    private BarChart<String, Number> createGradeLevelChart(List<StudentDto> students) {
+        CategoryAxis xAxis = new CategoryAxis();
+        NumberAxis yAxis = new NumberAxis();
+        BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
+        chart.setTitle("");
+        chart.setLegendVisible(false);
+        chart.setAnimated(true);
+        
+        xAxis.setLabel("Grade Level");
+        yAxis.setLabel("Number of Students");
+        
+        // Style axes - larger fonts for better readability
+        xAxis.setStyle("-fx-tick-label-font-size: 12px; -fx-tick-label-fill: #2c3e50; -fx-font-weight: bold;");
+        yAxis.setStyle("-fx-tick-label-font-size: 12px; -fx-tick-label-fill: #2c3e50; -fx-font-weight: bold;");
+        xAxis.getStyleClass().add("axis-label");
+        yAxis.getStyleClass().add("axis-label");
+        
+        // Count students by grade level
+        java.util.Map<Integer, Long> gradeCounts = students.stream()
+            .filter(s -> s.getGradeLevel() != null)
+            .collect(Collectors.groupingBy(
+                StudentDto::getGradeLevel,
+                Collectors.counting()
+            ));
+        
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        List<java.util.Map.Entry<Integer, Long>> sortedEntries = new java.util.ArrayList<>(gradeCounts.entrySet());
+        sortedEntries.sort(java.util.Map.Entry.comparingByKey());
+        
+        String[] colors = {"#3498db", "#9b59b6", "#e67e22", "#27ae60", "#e74c3c"};
+        
+        for (java.util.Map.Entry<Integer, Long> entry : sortedEntries) {
+            XYChart.Data<String, Number> data = new XYChart.Data<>("Grade " + entry.getKey(), entry.getValue());
+            series.getData().add(data);
+        }
+        
+        chart.getData().add(series);
+        
+        // Apply colors, hover effects, and add number labels on top of bars
+        chart.getData().get(0).getData().forEach(data -> {
+            int index = chart.getData().get(0).getData().indexOf(data);
+            String color = colors[index % colors.length];
+            Number value = data.getYValue();
+            
+            data.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                if (newNode != null) {
+                    newNode.setStyle("-fx-bar-fill: " + color + ";");
+                    
+                    // Add label on top of bar showing the number
+                    Label valueLabel = new Label(String.valueOf(value.intValue()));
+                    valueLabel.setStyle(
+                        "-fx-font-size: 12px; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-text-fill: #2c3e50; " +
+                        "-fx-background-color: rgba(255,255,255,0.9); " +
+                        "-fx-padding: 2 6; " +
+                        "-fx-background-radius: 3;"
+                    );
+                    
+                    // Position label above the bar
+                    Platform.runLater(() -> {
+                        if (newNode.getParent() != null) {
+                            StackPane barPane = (StackPane) newNode.getParent();
+                            barPane.getChildren().add(valueLabel);
+                            valueLabel.setTranslateY(-15); // Position above bar
+                        }
+                    });
+                    
+                    newNode.setOnMouseEntered(e -> {
+                        newNode.setStyle("-fx-bar-fill: " + color + "; -fx-opacity: 0.8;");
+                    });
+                    newNode.setOnMouseExited(e -> {
+                        newNode.setStyle("-fx-bar-fill: " + color + "; -fx-opacity: 1.0;");
+                    });
+                }
+            });
+            
+            if (data.getNode() != null) {
+                data.getNode().setStyle("-fx-bar-fill: " + color + ";");
+            }
+        });
+        
+        return chart;
+    }
+    
+    private BarChart<String, Number> createStrandChart(List<StudentDto> students) {
+        CategoryAxis xAxis = new CategoryAxis();
+        NumberAxis yAxis = new NumberAxis();
+        BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
+        chart.setTitle("");
+        chart.setLegendVisible(false);
+        chart.setAnimated(true);
+        
+        xAxis.setLabel("Strand");
+        yAxis.setLabel("Number of Students");
+        
+        // Style axes - larger fonts for better readability
+        xAxis.setStyle("-fx-tick-label-font-size: 11px; -fx-tick-label-fill: #2c3e50; -fx-font-weight: bold;");
+        yAxis.setStyle("-fx-tick-label-font-size: 12px; -fx-tick-label-fill: #2c3e50; -fx-font-weight: bold;");
+        xAxis.getStyleClass().add("axis-label");
+        yAxis.getStyleClass().add("axis-label");
+        
+        // Count students by strand
+        java.util.Map<String, Long> strandCounts = students.stream()
+            .filter(s -> s.getStrand() != null && !s.getStrand().isEmpty())
+            .collect(Collectors.groupingBy(
+                StudentDto::getStrand,
+                Collectors.counting()
+            ));
+        
+        // Strand colors
+        java.util.Map<String, String> strandColors = new java.util.HashMap<>();
+        strandColors.put("ABM", "#e74c3c");
+        strandColors.put("HUMSS", "#9b59b6");
+        strandColors.put("STEM", "#3498db");
+        strandColors.put("GAS", "#27ae60");
+        strandColors.put("TVL", "#f39c12");
+        
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        List<java.util.Map.Entry<String, Long>> sortedEntries = new java.util.ArrayList<>(strandCounts.entrySet());
+        sortedEntries.sort(java.util.Map.Entry.comparingByKey());
+        
+        for (java.util.Map.Entry<String, Long> entry : sortedEntries) {
+            XYChart.Data<String, Number> data = new XYChart.Data<>(entry.getKey(), entry.getValue());
+            series.getData().add(data);
+        }
+        
+        chart.getData().add(series);
+        
+        // Apply strand-specific colors, hover effects, and add number labels
+        for (int i = 0; i < chart.getData().get(0).getData().size(); i++) {
+            String strand = sortedEntries.get(i).getKey();
+            String color = strandColors.getOrDefault(strand.toUpperCase(), "#95a5a6");
+            XYChart.Data<String, Number> data = chart.getData().get(0).getData().get(i);
+            Number value = data.getYValue();
+            
+            data.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                if (newNode != null) {
+                    newNode.setStyle("-fx-bar-fill: " + color + ";");
+                    
+                    // Add label on top of bar showing the number
+                    Label valueLabel = new Label(String.valueOf(value.intValue()));
+                    valueLabel.setStyle(
+                        "-fx-font-size: 12px; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-text-fill: #2c3e50; " +
+                        "-fx-background-color: rgba(255,255,255,0.9); " +
+                        "-fx-padding: 2 6; " +
+                        "-fx-background-radius: 3;"
+                    );
+                    
+                    // Position label above the bar
+                    Platform.runLater(() -> {
+                        if (newNode.getParent() != null) {
+                            StackPane barPane = (StackPane) newNode.getParent();
+                            barPane.getChildren().add(valueLabel);
+                            valueLabel.setTranslateY(-15); // Position above bar
+                        }
+                    });
+                    
+                    newNode.setOnMouseEntered(e -> {
+                        newNode.setStyle("-fx-bar-fill: " + color + "; -fx-opacity: 0.8;");
+                    });
+                    newNode.setOnMouseExited(e -> {
+                        newNode.setStyle("-fx-bar-fill: " + color + "; -fx-opacity: 1.0;");
+                    });
+                }
+            });
+            
+            if (data.getNode() != null) {
+                data.getNode().setStyle("-fx-bar-fill: " + color + ";");
+            }
+        }
+        
+        return chart;
+    }
+    
+    private BarChart<String, Number> createSectionChart(List<StudentDto> students, List<Section> sections) {
+        CategoryAxis xAxis = new CategoryAxis();
+        NumberAxis yAxis = new NumberAxis();
+        BarChart<String, Number> chart = new BarChart<>(xAxis, yAxis);
+        chart.setTitle("");
+        chart.setLegendVisible(false);
+        chart.setAnimated(true);
+        
+        xAxis.setLabel("Section");
+        yAxis.setLabel("Number of Students");
+        
+        // Style axes - larger fonts for better readability
+        xAxis.setStyle("-fx-tick-label-font-size: 10px; -fx-tick-label-fill: #2c3e50; -fx-font-weight: bold;");
+        yAxis.setStyle("-fx-tick-label-font-size: 12px; -fx-tick-label-fill: #2c3e50; -fx-font-weight: bold;");
+        xAxis.getStyleClass().add("axis-label");
+        yAxis.getStyleClass().add("axis-label");
+        
+        // Count students by section
+        java.util.Map<Long, Long> sectionCounts = students.stream()
+            .filter(s -> s.getSectionId() != null)
+            .collect(Collectors.groupingBy(
+                StudentDto::getSectionId,
+                Collectors.counting()
+            ));
+        
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        String[] colors = {"#3498db", "#9b59b6", "#e67e22", "#27ae60", "#e74c3c", "#f39c12", "#1abc9c", "#34495e"};
+        
+        int colorIndex = 0;
+        for (Section section : sections) {
+            Long count = sectionCounts.getOrDefault(section.getId(), 0L);
+            if (count > 0) {
+                // Shorten section name if too long
+                String sectionName = section.getName();
+                if (sectionName.length() > 10) {
+                    sectionName = sectionName.substring(0, 8) + "..";
+                }
+                
+                XYChart.Data<String, Number> data = new XYChart.Data<>(sectionName, count);
+                series.getData().add(data);
+                
+                // Apply color
+                String color = colors[colorIndex % colors.length];
+                data.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                    if (newNode != null) {
+                        newNode.setStyle("-fx-bar-fill: " + color + ";");
+                        newNode.setOnMouseEntered(e -> {
+                            newNode.setStyle("-fx-bar-fill: " + color + "; -fx-opacity: 0.8;");
+                        });
+                        newNode.setOnMouseExited(e -> {
+                            newNode.setStyle("-fx-bar-fill: " + color + "; -fx-opacity: 1.0;");
+                        });
+                    }
+                });
+                
+                colorIndex++;
+            }
+        }
+        
+        chart.getData().add(series);
+        
+        // Add number labels on top of bars
+        for (int idx = 0; idx < chart.getData().get(0).getData().size(); idx++) {
+            XYChart.Data<String, Number> data = chart.getData().get(0).getData().get(idx);
+            Number value = data.getYValue();
+            String barColor = colors[idx % colors.length];
+            
+            data.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                if (newNode != null) {
+                    newNode.setStyle("-fx-bar-fill: " + barColor + ";");
+                    
+                    // Add label on top of bar showing the number
+                    Label valueLabel = new Label(String.valueOf(value.intValue()));
+                    valueLabel.setStyle(
+                        "-fx-font-size: 12px; " +
+                        "-fx-font-weight: bold; " +
+                        "-fx-text-fill: #2c3e50; " +
+                        "-fx-background-color: rgba(255,255,255,0.9); " +
+                        "-fx-padding: 2 6; " +
+                        "-fx-background-radius: 3;"
+                    );
+                    
+                    // Position label above the bar
+                    Platform.runLater(() -> {
+                        if (newNode.getParent() != null) {
+                            StackPane barPane = (StackPane) newNode.getParent();
+                            barPane.getChildren().add(valueLabel);
+                            valueLabel.setTranslateY(-15); // Position above bar
+                        }
+                    });
+                    
+                    newNode.setOnMouseEntered(e -> {
+                        newNode.setStyle("-fx-bar-fill: " + barColor + "; -fx-opacity: 0.8;");
+                    });
+                    newNode.setOnMouseExited(e -> {
+                        newNode.setStyle("-fx-bar-fill: " + barColor + "; -fx-opacity: 1.0;");
+                    });
+                }
+            });
+            
+            if (data.getNode() != null) {
+                data.getNode().setStyle("-fx-bar-fill: " + barColor + ";");
+            }
+        }
+        
+        return chart;
     }
     
     private void loadSubjectsPage() {
@@ -623,14 +1019,30 @@ public class TeacherDashboardController {
     private void buildSubjectsPage(List<Subject> subjects, List<Section> sections) {
         dashboardContent.getChildren().clear();
         
-        // Page Title
-        HBox titleBox = new HBox();
+        // Page Title with Export Button
+        HBox titleBox = new HBox(15);
         titleBox.setAlignment(Pos.CENTER_LEFT);
         titleBox.setPadding(new Insets(0, 0, 30, 0));
         
-        Label pageTitle = new Label("My Assigned Subjects");
+        Label pageTitle = new Label("Subjects");
         pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
-        titleBox.getChildren().add(pageTitle);
+        
+        // Export PDF Button
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        
+        Button exportPdfButton = new Button("📄 Export to PDF");
+        exportPdfButton.setStyle(
+            "-fx-background-color: #e74c3c; " +
+            "-fx-text-fill: white; " +
+            "-fx-font-size: 14px; " +
+            "-fx-padding: 10 20; " +
+            "-fx-background-radius: 5; " +
+            "-fx-cursor: hand;"
+        );
+        exportPdfButton.setOnAction(e -> exportMySubjectsToPDF(subjects, sections));
+        
+        titleBox.getChildren().addAll(pageTitle, spacer, exportPdfButton);
         dashboardContent.getChildren().add(titleBox);
         
         if (subjects.isEmpty()) {
@@ -688,6 +1100,448 @@ public class TeacherDashboardController {
         }
     }
     
+    private void exportMySubjectsToPDF(List<Subject> subjects, List<Section> sections) {
+        if (currentUser == null) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("No User");
+            alert.setHeaderText("User information not available");
+            alert.showAndWait();
+            return;
+        }
+        
+        if (subjects == null || subjects.isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("No Subjects");
+            alert.setHeaderText("No subjects assigned");
+            alert.setContentText("You don't have any assigned subjects to export.");
+            alert.showAndWait();
+            return;
+        }
+        
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Save PDF Report");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF Files", "*.pdf"));
+        String fileName = "My_Subjects_" + currentUser.getFullName().replaceAll("[^a-zA-Z0-9]", "_") + ".pdf";
+        fileChooser.setInitialFileName(fileName);
+        
+        Stage stage = (Stage) dashboardContent.getScene().getWindow();
+        File file = fileChooser.showSaveDialog(stage);
+        
+        if (file != null) {
+            new Thread(() -> {
+                try {
+                    generateMySubjectsPDF(file);
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                        alert.setTitle("Success");
+                        alert.setHeaderText("PDF exported successfully");
+                        alert.setContentText("File saved to: " + file.getAbsolutePath());
+                        alert.showAndWait();
+                    });
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                        alert.setTitle("Error");
+                        alert.setHeaderText("Failed to export PDF");
+                        alert.setContentText("Error: " + e.getMessage());
+                        alert.showAndWait();
+                    });
+                }
+            }).start();
+        }
+    }
+    
+    private void generateMySubjectsPDF(File file) throws IOException {
+        if (currentUser == null || teacherAssignmentRepository == null) {
+            throw new IllegalStateException("User or repository not available");
+        }
+        
+        // Get all teacher assignments (subject-section pairs)
+        List<com.enrollment.system.model.TeacherAssignment> assignments = 
+                teacherAssignmentRepository.findByTeacherId(currentUser.getId());
+        
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+            
+            PDPageContentStream contentStream = new PDPageContentStream(document, page);
+            try {
+                float margin = 72; // 1 inch margin
+                float pageWidth = page.getMediaBox().getWidth();
+                float pageHeight = page.getMediaBox().getHeight();
+                float yPosition = pageHeight - margin;
+                float lineHeight = 20;
+                float cellPadding = 10;
+                
+                PDType1Font fontBold = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
+                PDType1Font font = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA);
+                
+                // Title - centered
+                String title = "MY ASSIGNED SUBJECTS";
+                float titleFontSize = 20;
+                contentStream.setFont(fontBold, titleFontSize);
+                float titleWidth = fontBold.getStringWidth(title) / 1000 * titleFontSize;
+                float titleX = (pageWidth - titleWidth) / 2;
+                contentStream.beginText();
+                contentStream.setFont(fontBold, titleFontSize);
+                contentStream.newLineAtOffset(titleX, yPosition);
+                contentStream.showText(title);
+                contentStream.endText();
+                
+                yPosition -= 45;
+                
+                // Teacher Name - centered
+                String teacherText = "Teacher: " + currentUser.getFullName();
+                float teacherFontSize = 12;
+                contentStream.setFont(font, teacherFontSize);
+                float teacherWidth = font.getStringWidth(teacherText) / 1000 * teacherFontSize;
+                float teacherX = (pageWidth - teacherWidth) / 2;
+                contentStream.beginText();
+                contentStream.setFont(font, teacherFontSize);
+                contentStream.newLineAtOffset(teacherX, yPosition);
+                contentStream.showText(teacherText);
+                contentStream.endText();
+                
+                yPosition -= 25;
+                
+                // Date - centered
+                String dateText = "Generated: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM dd, yyyy"));
+                float dateFontSize = 12;
+                contentStream.setFont(font, dateFontSize);
+                float dateWidth = font.getStringWidth(dateText) / 1000 * dateFontSize;
+                float dateX = (pageWidth - dateWidth) / 2;
+                contentStream.beginText();
+                contentStream.setFont(font, dateFontSize);
+                contentStream.newLineAtOffset(dateX, yPosition);
+                contentStream.showText(dateText);
+                contentStream.endText();
+                
+                yPosition -= 40;
+                
+                // Table setup - centered table with proper column widths
+                float[] columnWidths = {220, 130, 110, 110}; // Subject Name, Section, Grade Level, Strand
+                float tableWidth = columnWidths[0] + columnWidths[1] + columnWidths[2] + columnWidths[3];
+                float tableStartX = (pageWidth - tableWidth) / 2; // Center the table
+                float headerHeight = lineHeight + (cellPadding * 2);
+                float tableStartY = yPosition;
+                
+                // Draw table header with clean background
+                contentStream.setNonStrokingColor(0.9f, 0.9f, 0.9f);
+                contentStream.addRect(tableStartX, tableStartY - headerHeight, tableWidth, headerHeight);
+                contentStream.fill();
+                contentStream.setNonStrokingColor(0, 0, 0);
+                
+                // Draw complete header border (all sides)
+                contentStream.setLineWidth(1.5f);
+                // Top border
+                contentStream.moveTo(tableStartX, tableStartY);
+                contentStream.lineTo(tableStartX + tableWidth, tableStartY);
+                contentStream.stroke();
+                // Bottom border of header
+                contentStream.moveTo(tableStartX, tableStartY - headerHeight);
+                contentStream.lineTo(tableStartX + tableWidth, tableStartY - headerHeight);
+                contentStream.stroke();
+                // Left border
+                contentStream.moveTo(tableStartX, tableStartY);
+                contentStream.lineTo(tableStartX, tableStartY - headerHeight);
+                contentStream.stroke();
+                // Right border
+                contentStream.moveTo(tableStartX + tableWidth, tableStartY);
+                contentStream.lineTo(tableStartX + tableWidth, tableStartY - headerHeight);
+                contentStream.stroke();
+                
+                // Draw vertical lines between header columns
+                contentStream.setLineWidth(1.0f);
+                float colX = tableStartX;
+                for (int i = 1; i < columnWidths.length; i++) {
+                    colX += columnWidths[i - 1];
+                    contentStream.moveTo(colX, tableStartY);
+                    contentStream.lineTo(colX, tableStartY - headerHeight);
+                    contentStream.stroke();
+                }
+                
+                // Table headers with proper padding
+                String[] headers = {"Subject Name", "Section", "Grade Level", "Strand"};
+                contentStream.setFont(fontBold, 11);
+                
+                float headerX = tableStartX + cellPadding;
+                for (int i = 0; i < headers.length; i++) {
+                    contentStream.beginText();
+                    contentStream.newLineAtOffset(headerX, tableStartY - cellPadding - 13);
+                    contentStream.showText(headers[i]);
+                    contentStream.endText();
+                    headerX += columnWidths[i];
+                }
+                
+                yPosition = tableStartY - headerHeight;
+                
+                // Table data
+                if (assignments == null || assignments.isEmpty()) {
+                    // No assignments message - centered
+                    String noDataText = "No assigned subjects found.";
+                    contentStream.setFont(font, 12);
+                    float noDataWidth = font.getStringWidth(noDataText) / 1000 * 12;
+                    float noDataX = (pageWidth - noDataWidth) / 2;
+                    contentStream.beginText();
+                    contentStream.setFont(font, 12);
+                    contentStream.newLineAtOffset(noDataX, yPosition - 20);
+                    contentStream.showText(noDataText);
+                    contentStream.endText();
+                } else {
+                    contentStream.setFont(font, 10);
+                    int rowNum = 0;
+                    float baseRowHeight = lineHeight + (cellPadding * 2);
+                    
+                    for (com.enrollment.system.model.TeacherAssignment assignment : assignments) {
+                        // Calculate subject name lines first to determine row height BEFORE drawing
+                        String subjectName = assignment.getSubject() != null ? assignment.getSubject().getName() : "N/A";
+                        float subjectColumnWidth = columnWidths[0] - (cellPadding * 2);
+                        java.util.List<String> subjectLines = wrapText(subjectName, font, 10, subjectColumnWidth);
+                        float actualRowHeight = baseRowHeight;
+                        if (subjectLines.size() > 1) {
+                            actualRowHeight = (lineHeight * subjectLines.size()) + (cellPadding * 2);
+                        }
+                        
+                        // Check if we need a new page (using actual row height)
+                        if (yPosition < margin + 60 + actualRowHeight) {
+                            // Draw bottom border of current table
+                            contentStream.setLineWidth(1.5f);
+                            contentStream.moveTo(tableStartX, yPosition);
+                            contentStream.lineTo(tableStartX + tableWidth, yPosition);
+                            contentStream.stroke();
+                            
+                            contentStream.close();
+                            page = new PDPage(PDRectangle.A4);
+                            document.addPage(page);
+                            contentStream = new PDPageContentStream(document, page);
+                            fontBold = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
+                            font = new PDType1Font(org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA);
+                            yPosition = pageHeight - margin;
+                            
+                            // Redraw header on new page
+                            tableStartY = yPosition;
+                            contentStream.setNonStrokingColor(0.9f, 0.9f, 0.9f);
+                            contentStream.addRect(tableStartX, tableStartY - headerHeight, tableWidth, headerHeight);
+                            contentStream.fill();
+                            contentStream.setNonStrokingColor(0, 0, 0);
+                            
+                            contentStream.setLineWidth(1.5f);
+                            contentStream.moveTo(tableStartX, tableStartY);
+                            contentStream.lineTo(tableStartX + tableWidth, tableStartY);
+                            contentStream.stroke();
+                            contentStream.moveTo(tableStartX, tableStartY - headerHeight);
+                            contentStream.lineTo(tableStartX + tableWidth, tableStartY - headerHeight);
+                            contentStream.stroke();
+                            contentStream.moveTo(tableStartX, tableStartY);
+                            contentStream.lineTo(tableStartX, tableStartY - headerHeight);
+                            contentStream.stroke();
+                            contentStream.moveTo(tableStartX + tableWidth, tableStartY);
+                            contentStream.lineTo(tableStartX + tableWidth, tableStartY - headerHeight);
+                            contentStream.stroke();
+                            
+                            contentStream.setLineWidth(1.0f);
+                            colX = tableStartX;
+                            for (int i = 1; i < columnWidths.length; i++) {
+                                colX += columnWidths[i - 1];
+                                contentStream.moveTo(colX, tableStartY);
+                                contentStream.lineTo(colX, tableStartY - headerHeight);
+                                contentStream.stroke();
+                            }
+                            
+                            headerX = tableStartX + cellPadding;
+                            contentStream.setFont(fontBold, 11);
+                            for (int i = 0; i < headers.length; i++) {
+                                contentStream.beginText();
+                                contentStream.newLineAtOffset(headerX, tableStartY - cellPadding - 13);
+                                contentStream.showText(headers[i]);
+                                contentStream.endText();
+                                headerX += columnWidths[i];
+                            }
+                            
+                            yPosition = tableStartY - headerHeight;
+                            contentStream.setFont(font, 10);
+                        }
+                        
+                        // Draw row background (alternating - only even rows get gray)
+                        if (rowNum % 2 == 0) {
+                            contentStream.setNonStrokingColor(0.95f, 0.95f, 0.95f);
+                            contentStream.addRect(tableStartX, yPosition - actualRowHeight, tableWidth, actualRowHeight);
+                            contentStream.fill();
+                            contentStream.setNonStrokingColor(0, 0, 0);
+                        }
+                        
+                        // Draw ALL row borders (complete rectangle for each row)
+                        contentStream.setLineWidth(0.5f);
+                        // Top border
+                        contentStream.moveTo(tableStartX, yPosition);
+                        contentStream.lineTo(tableStartX + tableWidth, yPosition);
+                        contentStream.stroke();
+                        // Bottom border
+                        contentStream.moveTo(tableStartX, yPosition - actualRowHeight);
+                        contentStream.lineTo(tableStartX + tableWidth, yPosition - actualRowHeight);
+                        contentStream.stroke();
+                        // Left border
+                        contentStream.moveTo(tableStartX, yPosition);
+                        contentStream.lineTo(tableStartX, yPosition - actualRowHeight);
+                        contentStream.stroke();
+                        // Right border
+                        contentStream.moveTo(tableStartX + tableWidth, yPosition);
+                        contentStream.lineTo(tableStartX + tableWidth, yPosition - actualRowHeight);
+                        contentStream.stroke();
+                        
+                        // Draw vertical lines between columns
+                        colX = tableStartX;
+                        for (int i = 1; i < columnWidths.length; i++) {
+                            colX += columnWidths[i - 1];
+                            contentStream.moveTo(colX, yPosition);
+                            contentStream.lineTo(colX, yPosition - actualRowHeight);
+                            contentStream.stroke();
+                        }
+                        
+                        float cellX = tableStartX + cellPadding;
+                        
+                        // Draw subject name (multiple lines if needed)
+                        float textY = yPosition - cellPadding - 13;
+                        for (int lineIdx = 0; lineIdx < subjectLines.size(); lineIdx++) {
+                            contentStream.beginText();
+                            contentStream.newLineAtOffset(cellX, textY - (lineIdx * lineHeight));
+                            contentStream.showText(subjectLines.get(lineIdx));
+                            contentStream.endText();
+                        }
+                        cellX += columnWidths[0];
+                        
+                        // Section - center vertically if subject name is multi-line
+                        String sectionName = assignment.getSection() != null ? assignment.getSection().getName() : "N/A";
+                        float sectionY = yPosition - cellPadding - 13;
+                        if (subjectLines.size() > 1) {
+                            // Center vertically in the cell
+                            sectionY = yPosition - (actualRowHeight / 2) - 5;
+                        }
+                        contentStream.beginText();
+                        contentStream.newLineAtOffset(cellX, sectionY);
+                        contentStream.showText(sectionName);
+                        contentStream.endText();
+                        cellX += columnWidths[1];
+                        
+                        // Grade Level - center vertically if subject name is multi-line
+                        String gradeLevel = assignment.getSection() != null && assignment.getSection().getGradeLevel() != null 
+                                ? assignment.getSection().getGradeLevel().toString() : "N/A";
+                        float gradeY = yPosition - cellPadding - 13;
+                        if (subjectLines.size() > 1) {
+                            gradeY = yPosition - (actualRowHeight / 2) - 5;
+                        }
+                        contentStream.beginText();
+                        contentStream.newLineAtOffset(cellX, gradeY);
+                        contentStream.showText(gradeLevel);
+                        contentStream.endText();
+                        cellX += columnWidths[2];
+                        
+                        // Strand - center vertically if subject name is multi-line
+                        String strand = assignment.getSection() != null && assignment.getSection().getStrand() != null 
+                                ? assignment.getSection().getStrand() : "N/A";
+                        float strandY = yPosition - cellPadding - 13;
+                        if (subjectLines.size() > 1) {
+                            strandY = yPosition - (actualRowHeight / 2) - 5;
+                        }
+                        contentStream.beginText();
+                        contentStream.newLineAtOffset(cellX, strandY);
+                        contentStream.showText(strand);
+                        contentStream.endText();
+                        
+                        yPosition -= actualRowHeight;
+                        rowNum++;
+                    }
+                    
+                    // Draw final bottom border
+                    contentStream.setLineWidth(1.5f);
+                    contentStream.moveTo(tableStartX, yPosition);
+                    contentStream.lineTo(tableStartX + tableWidth, yPosition);
+                    contentStream.stroke();
+                }
+                
+                // Footer - centered
+                yPosition -= 30;
+                String footerText = "Total Assignments: " + ((assignments == null) ? 0 : assignments.size());
+                contentStream.setFont(font, 11);
+                float footerWidth = font.getStringWidth(footerText) / 1000 * 11;
+                float footerX = (pageWidth - footerWidth) / 2;
+                contentStream.beginText();
+                contentStream.setFont(font, 11);
+                contentStream.newLineAtOffset(footerX, yPosition);
+                contentStream.showText(footerText);
+                contentStream.endText();
+            } finally {
+                if (contentStream != null) {
+                    contentStream.close();
+                }
+            }
+            
+            document.save(file);
+        }
+    }
+    
+    /**
+     * Helper method to wrap text into multiple lines based on available width
+     */
+    private java.util.List<String> wrapText(String text, PDType1Font font, float fontSize, float maxWidth) {
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            lines.add("N/A");
+            return lines;
+        }
+        
+        // Calculate approximate character width (font size * 0.6 is a good approximation for Helvetica)
+        float charWidth = fontSize * 0.6f;
+        int maxCharsPerLine = (int) (maxWidth / charWidth);
+        
+        if (text.length() <= maxCharsPerLine) {
+            lines.add(text);
+            return lines;
+        }
+        
+        // Split into words
+        String[] words = text.split("\\s+");
+        StringBuilder currentLine = new StringBuilder();
+        
+        for (String word : words) {
+            String testLine = currentLine.length() > 0 
+                ? currentLine.toString() + " " + word 
+                : word;
+            
+            // Check if adding this word would exceed the line width
+            if (testLine.length() <= maxCharsPerLine) {
+                currentLine = new StringBuilder(testLine);
+            } else {
+                // Save current line and start new one
+                if (currentLine.length() > 0) {
+                    lines.add(currentLine.toString());
+                    currentLine = new StringBuilder(word);
+                } else {
+                    // Word is too long, split it
+                    if (word.length() > maxCharsPerLine) {
+                        // Split the long word
+                        int start = 0;
+                        while (start < word.length()) {
+                            int end = Math.min(start + maxCharsPerLine, word.length());
+                            lines.add(word.substring(start, end));
+                            start = end;
+                        }
+                    } else {
+                        currentLine = new StringBuilder(word);
+                    }
+                }
+            }
+        }
+        
+        // Add the last line
+        if (currentLine.length() > 0) {
+            lines.add(currentLine.toString());
+        }
+        
+        return lines;
+    }
+    
     private VBox createSubjectCard(Subject subject, List<Section> sections, java.util.Map<Long, List<StudentDto>> studentsBySection) {
         VBox card = new VBox(12);
         card.setAlignment(Pos.TOP_LEFT);
@@ -699,42 +1553,45 @@ public class TeacherDashboardController {
         String[] gradientColors = getGradientForGrade(subject.getGradeLevel());
         String primaryColor = gradientColors[0];
         
+        // Sidebar-inspired design with gradient background
         card.setStyle(
-            "-fx-background-color: #ffffff; " +
+            "-fx-background-color: linear-gradient(to bottom right, #ffffff, #f8f9fa); " +
             "-fx-background-radius: 12; " +
-            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); " +
+            "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.15), 12, 0, 0, 3); " +
             "-fx-border-color: " + primaryColor + "; " +
-            "-fx-border-width: 2; " +
+            "-fx-border-width: 2.5; " +
             "-fx-border-radius: 12;"
         );
         
-        // Subject Name - simple and clean
+        // Subject Name - bold and prominent with sidebar color
         Label subjectName = new Label(subject.getName());
         subjectName.setStyle(
-            "-fx-font-size: 18px; " +
+            "-fx-font-size: 19px; " +
             "-fx-font-weight: bold; " +
             "-fx-text-fill: #2c3e50;"
         );
         subjectName.setWrapText(true);
         
-        // Grade Level - simple badge
+        // Grade Level - vibrant badge matching sidebar theme
         Label gradeLabel = new Label("Grade " + (subject.getGradeLevel() != null ? subject.getGradeLevel() : "N/A"));
         gradeLabel.setStyle(
             "-fx-font-size: 12px; " +
-            "-fx-text-fill: " + primaryColor + "; " +
-            "-fx-font-weight: 600; " +
-            "-fx-background-color: " + primaryColor + "15; " +
-            "-fx-padding: 4 10; " +
-            "-fx-background-radius: 8;"
+            "-fx-text-fill: white; " +
+            "-fx-font-weight: 700; " +
+            "-fx-background-color: " + primaryColor + "; " +
+            "-fx-padding: 5 12; " +
+            "-fx-background-radius: 8; " +
+            "-fx-effect: dropshadow(gaussian, " + primaryColor + "40, 5, 0, 0, 2);"
         );
         
-        // Sections - compact display
+        // Sections - compact display with sidebar-inspired styling
         VBox sectionsBox = new VBox(8);
         Label sectionsTitle = new Label("Sections:");
         sectionsTitle.setStyle(
             "-fx-font-size: 12px; " +
-            "-fx-text-fill: #7f8c8d; " +
-            "-fx-font-weight: 600;"
+            "-fx-text-fill: #34495e; " +
+            "-fx-font-weight: 700; " +
+            "-fx-padding: 0 0 2 0;"
         );
         sectionsBox.getChildren().add(sectionsTitle);
         
@@ -770,36 +1627,46 @@ public class TeacherDashboardController {
                 
                 Label sectionBadge = new Label(section.getName() + (studentCount > 0 ? " (" + studentCount + ")" : ""));
                 sectionBadge.setStyle(
-                    "-fx-background-color: " + finalPrimaryColor + "20; " +
+                    "-fx-background-color: " + finalPrimaryColor + "25; " +
                     "-fx-text-fill: " + finalPrimaryColor + "; " +
                     "-fx-font-size: 11px; " +
-                    "-fx-font-weight: 600; " +
-                    "-fx-padding: 4 10; " +
-                    "-fx-background-radius: 6; " +
+                    "-fx-font-weight: 700; " +
+                    "-fx-padding: 5 12; " +
+                    "-fx-background-radius: 8; " +
+                    "-fx-border-color: " + finalPrimaryColor + "40; " +
+                    "-fx-border-width: 1; " +
+                    "-fx-border-radius: 8; " +
                     "-fx-cursor: hand;"
                 );
                 
-                // Simple hover effect
+                // Enhanced hover effect with sidebar-inspired colors
                 sectionBadge.setOnMouseEntered(e -> {
                     sectionBadge.setStyle(
                         "-fx-background-color: " + finalPrimaryColor + "; " +
                         "-fx-text-fill: white; " +
                         "-fx-font-size: 11px; " +
-                        "-fx-font-weight: 600; " +
-                        "-fx-padding: 4 10; " +
-                        "-fx-background-radius: 6; " +
+                        "-fx-font-weight: 700; " +
+                        "-fx-padding: 5 12; " +
+                        "-fx-background-radius: 8; " +
+                        "-fx-border-color: " + finalPrimaryColor + "; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 8; " +
+                        "-fx-effect: dropshadow(gaussian, " + finalPrimaryColor + "50, 6, 0, 0, 2); " +
                         "-fx-cursor: hand;"
                     );
                 });
                 
                 sectionBadge.setOnMouseExited(e -> {
                     sectionBadge.setStyle(
-                        "-fx-background-color: " + finalPrimaryColor + "20; " +
+                        "-fx-background-color: " + finalPrimaryColor + "25; " +
                         "-fx-text-fill: " + finalPrimaryColor + "; " +
                         "-fx-font-size: 11px; " +
-                        "-fx-font-weight: 600; " +
-                        "-fx-padding: 4 10; " +
-                        "-fx-background-radius: 6; " +
+                        "-fx-font-weight: 700; " +
+                        "-fx-padding: 5 12; " +
+                        "-fx-background-radius: 8; " +
+                        "-fx-border-color: " + finalPrimaryColor + "40; " +
+                        "-fx-border-width: 1; " +
+                        "-fx-border-radius: 8; " +
                         "-fx-cursor: hand;"
                     );
                 });
@@ -834,14 +1701,14 @@ public class TeacherDashboardController {
         
         card.getChildren().addAll(subjectName, gradeLabel, sectionsBox);
         
-        // Simple hover effect
+        // Enhanced hover effect with sidebar-inspired colors
         card.setOnMouseEntered(e -> {
             card.setStyle(
-                "-fx-background-color: #f8f9fa; " +
+                "-fx-background-color: linear-gradient(to bottom right, #ffffff, " + primaryColor + "08); " +
                 "-fx-background-radius: 12; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 10, 0, 0, 3); " +
+                "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.2), 15, 0, 0, 4); " +
                 "-fx-border-color: " + primaryColor + "; " +
-                "-fx-border-width: 2; " +
+                "-fx-border-width: 3; " +
                 "-fx-border-radius: 12; " +
                 "-fx-cursor: default;"
             );
@@ -849,11 +1716,11 @@ public class TeacherDashboardController {
         
         card.setOnMouseExited(e -> {
             card.setStyle(
-                "-fx-background-color: #ffffff; " +
+                "-fx-background-color: linear-gradient(to bottom right, #ffffff, #f8f9fa); " +
                 "-fx-background-radius: 12; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); " +
+                "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.15), 12, 0, 0, 3); " +
                 "-fx-border-color: " + primaryColor + "; " +
-                "-fx-border-width: 2; " +
+                "-fx-border-width: 2.5; " +
                 "-fx-border-radius: 12; " +
                 "-fx-cursor: default;"
             );
@@ -863,22 +1730,22 @@ public class TeacherDashboardController {
     }
     
     private String[] getGradientForGrade(Integer gradeLevel) {
-        // Professional gradient colors - clean, modern, and elegant
-        // Grade 11: Professional blue gradient
-        // Grade 12: Professional indigo gradient
+        // Sidebar-inspired colors - consistent with #2c3e50, #34495e theme
+        // Grade 11: Vibrant blue that complements sidebar
+        // Grade 12: Rich indigo-purple that complements sidebar
         if (gradeLevel == null) {
-            return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"}; // Default: Professional blue
+            return new String[]{"#3498db", "#2980b9", "#1f6391"}; // Default: Vibrant blue
         }
         
         switch (gradeLevel) {
             case 11:
-                // Professional blue gradient - clean and modern
-                return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"};
+                // Vibrant blue - complements sidebar's #2c3e50, energetic and clean
+                return new String[]{"#3498db", "#2980b9", "#1f6391"};
             case 12:
-                // Professional indigo gradient - elegant and refined
-                return new String[]{"#845ef7", "#7048e8", "#5f3dc4"};
+                // Rich indigo-purple - complements sidebar, elegant and refined
+                return new String[]{"#9b59b6", "#8e44ad", "#7d3c98"};
             default:
-                return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"}; // Default: Professional blue
+                return new String[]{"#3498db", "#2980b9", "#1f6391"}; // Default: Vibrant blue
         }
     }
     
@@ -952,7 +1819,7 @@ public class TeacherDashboardController {
         titleBox.setAlignment(Pos.CENTER_LEFT);
         titleBox.setPadding(new Insets(0, 0, 30, 0));
         
-        Label pageTitle = new Label("My Students");
+        Label pageTitle = new Label("Sections and Students");
         pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
         titleBox.getChildren().add(pageTitle);
         dashboardContent.getChildren().add(titleBox);
@@ -1074,51 +1941,54 @@ public class TeacherDashboardController {
         String[] colors = getColorSchemeForStrand(section.getStrand());
         String primaryColor = colors[0];
         
-        // Simple white background with colored border
+        // Sidebar-inspired design with gradient background
         card.setStyle(
-            "-fx-background-color: #ffffff; " +
+            "-fx-background-color: linear-gradient(to bottom right, #ffffff, #f8f9fa); " +
             "-fx-background-radius: 12; " +
-            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); " +
+            "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.15), 12, 0, 0, 3); " +
             "-fx-border-color: " + primaryColor + "; " +
-            "-fx-border-width: 2; " +
+            "-fx-border-width: 2.5; " +
             "-fx-border-radius: 12;"
         );
         
-        // Section Name
+        // Section Name - bold with sidebar color
         Label sectionName = new Label(section.getName());
         sectionName.setStyle(
-            "-fx-font-size: 18px; " +
+            "-fx-font-size: 19px; " +
             "-fx-font-weight: bold; " +
             "-fx-text-fill: #2c3e50;"
         );
         
-        // Strand and Grade
+        // Strand and Grade - sidebar-inspired styling
         Label strandLabel = new Label(section.getStrand() + " • Grade " + (section.getGradeLevel() != null ? section.getGradeLevel() : "N/A"));
         strandLabel.setStyle(
             "-fx-font-size: 12px; " +
-            "-fx-text-fill: #7f8c8d; " +
-            "-fx-font-weight: 500;"
+            "-fx-text-fill: #34495e; " +
+            "-fx-font-weight: 600;"
         );
         
-        // Student count
+        // Student count - vibrant badge
         Label studentCountLabel = new Label(studentCount + " student" + (studentCount != 1 ? "s" : ""));
         studentCountLabel.setStyle(
             "-fx-font-size: 14px; " +
-            "-fx-font-weight: 600; " +
-            "-fx-text-fill: " + primaryColor + "; " +
-            "-fx-padding: 6 0 0 0;"
+            "-fx-font-weight: 700; " +
+            "-fx-text-fill: white; " +
+            "-fx-background-color: " + primaryColor + "; " +
+            "-fx-padding: 6 14; " +
+            "-fx-background-radius: 8; " +
+            "-fx-effect: dropshadow(gaussian, " + primaryColor + "40, 5, 0, 0, 2);"
         );
         
         card.getChildren().addAll(sectionName, strandLabel, studentCountLabel);
         
-        // Simple hover effect
+        // Enhanced hover effect with sidebar-inspired colors
         card.setOnMouseEntered(e -> {
             card.setStyle(
-                "-fx-background-color: " + primaryColor + "08; " +
+                "-fx-background-color: linear-gradient(to bottom right, #ffffff, " + primaryColor + "10); " +
                 "-fx-background-radius: 12; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 10, 0, 0, 3); " +
+                "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.2), 15, 0, 0, 4); " +
                 "-fx-border-color: " + primaryColor + "; " +
-                "-fx-border-width: 2; " +
+                "-fx-border-width: 3; " +
                 "-fx-border-radius: 12; " +
                 "-fx-cursor: hand;"
             );
@@ -1126,11 +1996,11 @@ public class TeacherDashboardController {
         
         card.setOnMouseExited(e -> {
             card.setStyle(
-                "-fx-background-color: #ffffff; " +
+                "-fx-background-color: linear-gradient(to bottom right, #ffffff, #f8f9fa); " +
                 "-fx-background-radius: 12; " +
-                "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 8, 0, 0, 2); " +
+                "-fx-effect: dropshadow(gaussian, rgba(44,62,80,0.15), 12, 0, 0, 3); " +
                 "-fx-border-color: " + primaryColor + "; " +
-                "-fx-border-width: 2; " +
+                "-fx-border-width: 2.5; " +
                 "-fx-border-radius: 12; " +
                 "-fx-cursor: default;"
             );
@@ -1140,23 +2010,29 @@ public class TeacherDashboardController {
     }
     
     private String[] getColorSchemeForStrand(String strand) {
+        // Sidebar-inspired color scheme - vibrant colors that complement #2c3e50, #34495e
         if (strand == null) {
-            return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"}; // Professional blue
+            return new String[]{"#3498db", "#2980b9", "#1f6391"}; // Vibrant blue (matches sidebar theme)
         }
         
         switch (strand.toUpperCase()) {
             case "ABM":
-                return new String[]{"#ff6b6b", "#ee5a6f", "#ff8787"}; // Professional coral
+                // Energetic coral-red that complements sidebar
+                return new String[]{"#e74c3c", "#c0392b", "#a93226"};
             case "HUMSS":
-                return new String[]{"#9775fa", "#845ef7", "#b197fc"}; // Professional purple
+                // Rich purple that complements sidebar
+                return new String[]{"#9b59b6", "#8e44ad", "#7d3c98"};
             case "STEM":
-                return new String[]{"#4dabf7", "#339af0", "#74c0fc"}; // Professional blue
+                // Vibrant blue that matches sidebar's blue tones
+                return new String[]{"#3498db", "#2980b9", "#1f6391"};
             case "GAS":
-                return new String[]{"#51cf66", "#40c057", "#69db7c"}; // Professional green
+                // Fresh green that complements sidebar
+                return new String[]{"#27ae60", "#229954", "#1e8449"};
             case "TVL":
-                return new String[]{"#ff922b", "#fd7e14", "#ffa94d"}; // Professional orange
+                // Warm orange that complements sidebar
+                return new String[]{"#f39c12", "#e67e22", "#d35400"};
             default:
-                return new String[]{"#5c7cfa", "#4c6ef5", "#364fc7"}; // Default Professional blue
+                return new String[]{"#34495e", "#2c3e50", "#1a252f"}; // Default: Sidebar colors
         }
     }
     
@@ -1772,35 +2648,46 @@ public class TeacherDashboardController {
         }
         
         dashboardContent.getChildren().clear();
+        dashboardContent.setAlignment(Pos.TOP_CENTER);
+        dashboardContent.setPadding(new Insets(15, 40, 15, 40));
         
         // Page Title
         Label pageTitle = new Label("Account Settings");
-        pageTitle.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 30 0;");
-        dashboardContent.getChildren().add(pageTitle);
+        pageTitle.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 20 0;");
+        HBox titleContainer = new HBox();
+        titleContainer.setAlignment(Pos.CENTER);
+        titleContainer.getChildren().add(pageTitle);
+        dashboardContent.getChildren().add(titleContainer);
         
-        // Main container
-        VBox mainContainer = new VBox(25);
-        mainContainer.setPadding(new Insets(20));
-        mainContainer.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 8, 0, 0, 2);");
+        // Outer container to center and constrain width
+        VBox outerContainer = new VBox();
+        outerContainer.setMaxWidth(600);
+        outerContainer.setAlignment(Pos.CENTER);
         
-        // Profile Picture Section
-        VBox profilePictureSection = new VBox(15);
-        profilePictureSection.setAlignment(Pos.CENTER);
-        profilePictureSection.setPadding(new Insets(20));
+        // Main container with improved styling and sidebar-themed border
+        VBox mainContainer = new VBox(0);
+        mainContainer.setMaxWidth(600);
+        mainContainer.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 16; -fx-border-color: #34495e; -fx-border-width: 3; -fx-border-radius: 16; -fx-effect: dropshadow(gaussian, rgba(44,62,80,0.15), 12, 0, 0, 4);");
         
-        Label profilePictureLabel = new Label("Profile Picture");
-        profilePictureLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        // Profile Picture Section - integrated directly into main container
+        VBox profileSection = new VBox(20);
+        profileSection.setPadding(new Insets(35, 35, 30, 35));
+        profileSection.setAlignment(Pos.CENTER);
+        profileSection.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 16 16 0 0;");
         
-        // Profile picture display - circular container
+        Label profileSectionTitle = new Label("Profile Picture");
+        profileSectionTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 5 0;");
+        
+        // Profile picture display - circular container with sidebar-themed border
         accountSettingsProfileContainer = new StackPane();
-        accountSettingsProfileContainer.setPrefWidth(150);
-        accountSettingsProfileContainer.setPrefHeight(150);
-        accountSettingsProfileContainer.setStyle("-fx-background-color: #ecf0f1; -fx-background-radius: 75;");
+        accountSettingsProfileContainer.setPrefWidth(140);
+        accountSettingsProfileContainer.setPrefHeight(140);
+        accountSettingsProfileContainer.setStyle("-fx-background-color: #ecf0f1; -fx-background-radius: 70; -fx-border-color: #34495e; -fx-border-width: 4; -fx-border-radius: 70;");
         
         // Profile picture ImageView - circular
         accountSettingsProfileImageView = new ImageView();
-        accountSettingsProfileImageView.setFitWidth(150);
-        accountSettingsProfileImageView.setFitHeight(150);
+        accountSettingsProfileImageView.setFitWidth(140);
+        accountSettingsProfileImageView.setFitHeight(140);
         accountSettingsProfileImageView.setPreserveRatio(true);
         accountSettingsProfileImageView.setSmooth(true);
         accountSettingsProfileImageView.setCache(true);
@@ -1819,12 +2706,12 @@ public class TeacherDashboardController {
         });
         
         // Set initial clip
-        Circle initialClip = new Circle(75, 75, 75);
+        Circle initialClip = new Circle(70, 70, 70);
         accountSettingsProfileImageView.setClip(initialClip);
         
         // Initials label (shown when no picture)
         accountSettingsInitialsLabel = new Label(getInitials(currentUser.getFullName()));
-        accountSettingsInitialsLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 48px; -fx-font-weight: bold;");
+        accountSettingsInitialsLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 44px; -fx-font-weight: bold;");
         
         // Load existing profile picture if available
         boolean hasPicture = false;
@@ -1832,7 +2719,7 @@ public class TeacherDashboardController {
             try {
                 File imageFile = new File(currentUser.getProfilePicture());
                 if (imageFile.exists()) {
-                    Image image = new Image(imageFile.toURI().toString(), 150, 150, true, true, true);
+                    Image image = new Image(imageFile.toURI().toString(), 140, 140, true, true, true);
                     accountSettingsProfileImageView.setImage(image);
                     accountSettingsProfileImageView.setVisible(true);
                     accountSettingsInitialsLabel.setVisible(false);
@@ -1847,45 +2734,67 @@ public class TeacherDashboardController {
             accountSettingsProfileImageView.setVisible(false);
             accountSettingsInitialsLabel.setVisible(true);
             String color = getColorForName(currentUser.getFullName());
-            accountSettingsProfileContainer.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 75;");
-            accountSettingsInitialsLabel.setStyle("-fx-text-fill: white; -fx-font-size: 48px; -fx-font-weight: bold;");
+            accountSettingsProfileContainer.setStyle("-fx-background-color: " + color + "; -fx-background-radius: 70; -fx-border-color: #34495e; -fx-border-width: 4; -fx-border-radius: 70;");
+            accountSettingsInitialsLabel.setStyle("-fx-text-fill: white; -fx-font-size: 44px; -fx-font-weight: bold;");
         }
         
         accountSettingsProfileContainer.getChildren().addAll(accountSettingsProfileImageView, accountSettingsInitialsLabel);
         
-        // Upload button
+        // Upload button with sidebar-themed styling
         Button uploadButton = new Button("📷 Upload Picture");
-        uploadButton.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20; -fx-background-radius: 8; -fx-cursor: hand;");
+        uploadButton.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: 600; -fx-padding: 10 24; -fx-background-radius: 8; -fx-cursor: hand; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);");
+        uploadButton.setOnMouseEntered(e -> uploadButton.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: 600; -fx-padding: 10 24; -fx-background-radius: 8; -fx-cursor: hand; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 6, 0, 2, 3);"));
+        uploadButton.setOnMouseExited(e -> uploadButton.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: 600; -fx-padding: 10 24; -fx-background-radius: 8; -fx-cursor: hand; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"));
         uploadButton.setOnAction(e -> handleProfilePictureUpload(accountSettingsProfileImageView));
         
         // File size info
         Label fileSizeLabel = new Label("Maximum file size: 3 MB");
-        fileSizeLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #7f8c8d;");
+        fileSizeLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #7f8c8d; -fx-font-style: italic;");
         
-        profilePictureSection.getChildren().addAll(profilePictureLabel, accountSettingsProfileContainer, uploadButton, fileSizeLabel);
+        profileSection.getChildren().addAll(profileSectionTitle, accountSettingsProfileContainer, uploadButton, fileSizeLabel);
+        
+        // Divider with sidebar-themed color
+        Region divider = new Region();
+        divider.setPrefHeight(1);
+        divider.setStyle("-fx-background-color: #bdc3c7;");
         
         // Form Section
-        VBox formSection = new VBox(20);
-        formSection.setPadding(new Insets(20));
+        VBox formCard = new VBox(25);
+        formCard.setPadding(new Insets(35, 35, 40, 35));
+        formCard.setStyle("-fx-background-color: #ffffff; -fx-background-radius: 0 0 16 16;");
         
-        // Name Field
+        Label formSectionTitle = new Label("Account Information");
+        formSectionTitle.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2c3e50; -fx-padding: 0 0 5 0;");
+        
+        // Name Field with sidebar-themed styling
         VBox nameFieldBox = new VBox(8);
-        Label nameLabel = new Label("Full Name *");
-        nameLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        Label nameLabel = new Label("Full Name");
+        nameLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #2c3e50;");
         TextField nameField = new TextField(currentUser.getFullName());
-        nameField.setStyle("-fx-font-size: 14px; -fx-padding: 10; -fx-background-radius: 8; -fx-border-color: #bdc3c7; -fx-border-radius: 8;");
-        nameField.setPrefWidth(400);
+        nameField.setStyle("-fx-font-size: 14px; -fx-padding: 12 15; -fx-background-color: #f8f9fa; -fx-background-radius: 8; -fx-border-color: #bdc3c7; -fx-border-width: 1.5; -fx-border-radius: 8;");
+        nameField.setPrefWidth(530);
+        nameField.setMaxWidth(530);
+        nameField.setOnMouseEntered(e -> nameField.setStyle("-fx-font-size: 14px; -fx-padding: 12 15; -fx-background-color: #ffffff; -fx-background-radius: 8; -fx-border-color: #34495e; -fx-border-width: 1.5; -fx-border-radius: 8;"));
+        nameField.setOnMouseExited(e -> nameField.setStyle("-fx-font-size: 14px; -fx-padding: 12 15; -fx-background-color: #f8f9fa; -fx-background-radius: 8; -fx-border-color: #bdc3c7; -fx-border-width: 1.5; -fx-border-radius: 8;"));
+        nameField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+            if (isNowFocused) {
+                nameField.setStyle("-fx-font-size: 14px; -fx-padding: 12 15; -fx-background-color: #ffffff; -fx-background-radius: 8; -fx-border-color: #34495e; -fx-border-width: 2; -fx-border-radius: 8;");
+            } else {
+                nameField.setStyle("-fx-font-size: 14px; -fx-padding: 12 15; -fx-background-color: #f8f9fa; -fx-background-radius: 8; -fx-border-color: #bdc3c7; -fx-border-width: 1.5; -fx-border-radius: 8;");
+            }
+        });
         nameFieldBox.getChildren().addAll(nameLabel, nameField);
         
-        // Password Field (Disabled)
+        // Password Field (Disabled) with improved styling
         VBox passwordFieldBox = new VBox(8);
         Label passwordLabel = new Label("Password");
-        passwordLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2c3e50;");
+        passwordLabel.setStyle("-fx-font-size: 13px; -fx-font-weight: 600; -fx-text-fill: #2c3e50;");
         PasswordField passwordField = new PasswordField();
         passwordField.setText("••••••••");
         passwordField.setDisable(true);
-        passwordField.setStyle("-fx-font-size: 14px; -fx-padding: 10; -fx-background-color: #ecf0f1; -fx-background-radius: 8; -fx-border-color: #bdc3c7; -fx-border-radius: 8; -fx-opacity: 0.7;");
-        passwordField.setPrefWidth(400);
+        passwordField.setStyle("-fx-font-size: 14px; -fx-padding: 12 15; -fx-background-color: #e9ecef; -fx-background-radius: 8; -fx-border-color: #ced4da; -fx-border-width: 1.5; -fx-border-radius: 8; -fx-opacity: 0.8;");
+        passwordField.setPrefWidth(530);
+        passwordField.setMaxWidth(530);
         
         // Show alert when trying to edit password
         passwordField.setOnMouseClicked(e -> {
@@ -1896,19 +2805,26 @@ public class TeacherDashboardController {
             alert.showAndWait();
         });
         
-        Label passwordInfoLabel = new Label("Contact administrator to change password");
-        passwordInfoLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #7f8c8d; -fx-font-style: italic;");
+        Label passwordInfoLabel = new Label("ℹ️ Contact administrator to change password");
+        passwordInfoLabel.setStyle("-fx-font-size: 11px; -fx-text-fill: #7f8c8d; -fx-font-style: italic; -fx-padding: 2 0 0 0;");
         passwordFieldBox.getChildren().addAll(passwordLabel, passwordField, passwordInfoLabel);
         
-        // Save Button
+        // Save Button with sidebar-themed styling
+        HBox buttonContainer = new HBox();
+        buttonContainer.setAlignment(Pos.CENTER);
+        buttonContainer.setPadding(new Insets(15, 0, 5, 0));
         Button saveButton = new Button("💾 Save Changes");
-        saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-padding: 12 30; -fx-background-radius: 8; -fx-cursor: hand;");
+        saveButton.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold; -fx-padding: 14 40; -fx-background-radius: 8; -fx-cursor: hand; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);");
+        saveButton.setOnMouseEntered(e -> saveButton.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold; -fx-padding: 14 40; -fx-background-radius: 8; -fx-cursor: hand; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 6, 0, 2, 3);"));
+        saveButton.setOnMouseExited(e -> saveButton.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold; -fx-padding: 14 40; -fx-background-radius: 8; -fx-cursor: hand; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"));
         saveButton.setOnAction(e -> handleSaveProfile(nameField.getText().trim(), accountSettingsProfileImageView, saveButton));
+        buttonContainer.getChildren().add(saveButton);
         
-        formSection.getChildren().addAll(nameFieldBox, passwordFieldBox, saveButton);
+        formCard.getChildren().addAll(formSectionTitle, nameFieldBox, passwordFieldBox, buttonContainer);
         
-        mainContainer.getChildren().addAll(profilePictureSection, formSection);
-        dashboardContent.getChildren().add(mainContainer);
+        mainContainer.getChildren().addAll(profileSection, divider, formCard);
+        outerContainer.getChildren().add(mainContainer);
+        dashboardContent.getChildren().add(outerContainer);
     }
     
     private File selectedProfilePictureFile = null;
@@ -2165,13 +3081,13 @@ public class TeacherDashboardController {
         actionCol.setPrefWidth(100);
         actionCol.setStyle("-fx-font-size: 13px;");
         actionCol.setCellFactory(param -> new TableCell<StudentDto, Void>() {
-            private final Button editButton = new Button("✏️");
+            private final Button editButton = new Button("Edit");
             {
                 editButton.setStyle(
                     "-fx-background-color: #3498db; " +
                     "-fx-text-fill: white; " +
                     "-fx-font-size: 12px; " +
-                    "-fx-padding: 5 10; " +
+                    "-fx-padding: 5 15; " +
                     "-fx-background-radius: 5; " +
                     "-fx-cursor: hand;"
                 );
