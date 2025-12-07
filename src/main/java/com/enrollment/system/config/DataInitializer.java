@@ -63,6 +63,9 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired(required = false)
     private com.enrollment.system.util.DatabaseSchemaFixer databaseSchemaFixer;
     
+    @Autowired(required = false)
+    private com.enrollment.system.util.TeacherSubjectAssigner teacherSubjectAssigner;
+    
     @Override
     public void run(String... args) throws Exception {
         // Clear all teacher assignments to fix database conflicts
@@ -1279,6 +1282,16 @@ public class DataInitializer implements CommandLineRunner {
             System.out.println("✓ Created " + subjectsCreated + " sample subjects (Grade 11 and Grade 12)");
         } else {
             System.out.println("✓ Subjects already exist in database");
+        }
+        
+        // Assign sample subjects to Hazel and Arnel for testing
+        try {
+            if (teacherSubjectAssigner != null) {
+                teacherSubjectAssigner.assignSampleSubjectsToTestTeachers();
+            }
+        } catch (Exception e) {
+            System.err.println("⚠ Warning: Could not assign sample subjects to test teachers: " + e.getMessage());
+            // Continue - don't block application startup
         }
     }
 }

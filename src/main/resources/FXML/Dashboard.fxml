@@ -66,9 +66,9 @@
                 
                 <!-- Submenu Items -->
                 <VBox fx:id="reportsSubmenu" spacing="2" style="-fx-padding: 5 0 5 25;" visible="false" managed="false">
-                    <Button fx:id="btnByGradeLevel" text="  📈 By Grade Level" onAction="#showByGradeLevel"
+                    <Button fx:id="btnStudentListBySection" text="  📋 Student List by Section" onAction="#showStudentListBySection"
                             style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
-                    <Button fx:id="btnByStrand" text="  🎯 By Strand" onAction="#showByStrand"
+                    <Button fx:id="btnTeacherAssignmentReport" text="  👨‍🏫 Teacher Assignment Report" onAction="#showTeacherAssignmentReport"
                             style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>
                     <Button fx:id="btnEnrollmentSummary" text="  📑 Enrollment Summary" onAction="#showEnrollmentSummary"
                             style="-fx-background-color: #3d4f5f; -fx-text-fill: #ecf0f1; -fx-font-size: 13px; -fx-padding: 11 18; -fx-alignment: center-left; -fx-background-radius: 6; -fx-cursor: hand; -fx-pref-width: 225;"/>

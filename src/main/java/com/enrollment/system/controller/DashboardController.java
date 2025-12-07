@@ -53,10 +53,10 @@ public class DashboardController {
     private Button btnReports;
     
     @FXML
-    private Button btnByGradeLevel;
+    private Button btnStudentListBySection;
     
     @FXML
-    private Button btnByStrand;
+    private Button btnTeacherAssignmentReport;
     
     @FXML
     private Button btnEnrollmentSummary;
@@ -167,8 +167,8 @@ public class DashboardController {
         try {
             setupSubmenuButtonHover(btnAddStudent, "#27ae60");
             setupSubmenuButtonHover(btnViewStudents, "#3498db");
-            setupSubmenuButtonHover(btnByGradeLevel, "#3498db");
-            setupSubmenuButtonHover(btnByStrand, "#9b59b6");
+            setupSubmenuButtonHover(btnStudentListBySection, "#3498db");
+            setupSubmenuButtonHover(btnTeacherAssignmentReport, "#9b59b6");
             setupSubmenuButtonHover(btnEnrollmentSummary, "#16a085");
             setupSubmenuButtonHover(btnArchiveStudents, "#95a5a6");
             setupSubmenuButtonHover(btnUserAccounts, "#3498db");
@@ -547,24 +547,111 @@ public class DashboardController {
     }
     
     @FXML
-    private void showByGradeLevel() {
+    private void showStudentListBySection() {
         resetSubmenuButtonStyles();
-        btnByGradeLevel.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
-        // Blank for now
+        btnStudentListBySection.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
+        
+        try {
+            // Load Student List by Section FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/StudentListBySection.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent studentListRoot = loader.load();
+            
+            // Create new stage for Student List by Section
+            Stage studentListStage = new Stage();
+            studentListStage.setTitle("Student List by Section - Seguinon SHS Enrollment System");
+            studentListStage.setScene(new Scene(studentListRoot));
+            studentListStage.setWidth(1400);
+            studentListStage.setHeight(800);
+            studentListStage.setResizable(true);
+            
+            // Set owner to dashboard stage
+            Stage dashboardStage = (Stage) btnStudentListBySection.getScene().getWindow();
+            studentListStage.initOwner(dashboardStage);
+            
+            // Show Student List by Section window
+            studentListStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load Student List by Section page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
     }
     
     @FXML
-    private void showByStrand() {
+    private void showTeacherAssignmentReport() {
         resetSubmenuButtonStyles();
-        btnByStrand.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
-        // Blank for now
+        btnTeacherAssignmentReport.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
+        
+        try {
+            // Load Teacher Assignment Report FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/TeacherAssignmentReport.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent teacherReportRoot = loader.load();
+            
+            // Create new stage for Teacher Assignment Report
+            Stage teacherReportStage = new Stage();
+            teacherReportStage.setTitle("Teacher Assignment Report - Seguinon SHS Enrollment System");
+            teacherReportStage.setScene(new Scene(teacherReportRoot));
+            teacherReportStage.setWidth(1200);
+            teacherReportStage.setHeight(800);
+            teacherReportStage.setResizable(true);
+            
+            // Set owner to dashboard stage
+            Stage dashboardStage = (Stage) btnTeacherAssignmentReport.getScene().getWindow();
+            teacherReportStage.initOwner(dashboardStage);
+            
+            // Show Teacher Assignment Report window
+            teacherReportStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load Teacher Assignment Report page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
     }
     
     @FXML
     private void showEnrollmentSummary() {
         resetSubmenuButtonStyles();
         btnEnrollmentSummary.setStyle("-fx-background-color: #2c3e50; -fx-text-fill: white; -fx-font-size: 13px; -fx-padding: 10 20; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 210;");
-        // Blank for now
+        
+        try {
+            // Load Enrollment Summary FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/EnrollmentSummary.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent enrollmentSummaryRoot = loader.load();
+            
+            // Create new stage for Enrollment Summary
+            Stage enrollmentSummaryStage = new Stage();
+            enrollmentSummaryStage.setTitle("Enrollment Summary - Seguinon SHS Enrollment System");
+            enrollmentSummaryStage.setScene(new Scene(enrollmentSummaryRoot));
+            enrollmentSummaryStage.setWidth(1200);
+            enrollmentSummaryStage.setHeight(800);
+            enrollmentSummaryStage.setResizable(true);
+            
+            // Set owner to dashboard stage
+            Stage dashboardStage = (Stage) btnEnrollmentSummary.getScene().getWindow();
+            enrollmentSummaryStage.initOwner(dashboardStage);
+            
+            // Show Enrollment Summary window
+            enrollmentSummaryStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load Enrollment Summary page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
     }
     
     @FXML
@@ -908,8 +995,8 @@ public class DashboardController {
         String nestedSubmenuStyle = "-fx-background-color: #2c3e50; -fx-text-fill: #ecf0f1; -fx-font-size: 12px; -fx-padding: 10 16; -fx-alignment: center-left; -fx-background-radius: 5; -fx-cursor: hand; -fx-pref-width: 200;";
         if (btnAddStudent != null) btnAddStudent.setStyle(defaultStyle);
         if (btnViewStudents != null) btnViewStudents.setStyle(defaultStyle);
-        if (btnByGradeLevel != null) btnByGradeLevel.setStyle(defaultStyle);
-        if (btnByStrand != null) btnByStrand.setStyle(defaultStyle);
+        if (btnStudentListBySection != null) btnStudentListBySection.setStyle(defaultStyle);
+        if (btnTeacherAssignmentReport != null) btnTeacherAssignmentReport.setStyle(defaultStyle);
         if (btnEnrollmentSummary != null) btnEnrollmentSummary.setStyle(defaultStyle);
         if (btnUserAccounts != null) btnUserAccounts.setStyle(defaultStyle);
         if (btnProfile != null) btnProfile.setStyle(nestedSubmenuStyle);
