@@ -161,6 +161,18 @@ public class ArchiveStudentsController implements Initializable {
                 if (empty) {
                     setGraphic(null);
                 } else {
+                    StudentDto student = getTableView().getItems().get(getIndex());
+                    // Disable re-enroll button for graduated students
+                    String archiveReason = student.getArchiveReason();
+                    boolean isGraduated = archiveReason != null && "GRADUATED".equalsIgnoreCase(archiveReason.trim());
+                    reEnrollButton.setDisable(isGraduated);
+                    if (isGraduated) {
+                        reEnrollButton.setStyle("-fx-background-color: #95a5a6; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: default;");
+                        reEnrollButton.setTooltip(new Tooltip("Graduated students cannot be re-enrolled"));
+                    } else {
+                        reEnrollButton.setStyle("-fx-background-color: #e67e22; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-background-radius: 3; -fx-cursor: hand;");
+                        reEnrollButton.setTooltip(null);
+                    }
                     hbox.setAlignment(javafx.geometry.Pos.CENTER);
                     setGraphic(hbox);
                 }
@@ -276,6 +288,13 @@ public class ArchiveStudentsController implements Initializable {
     
     private void handleReEnroll(StudentDto student) {
         try {
+            // Check if student is graduated - prevent re-enrollment
+            String archiveReason = student.getArchiveReason();
+            if (archiveReason != null && "GRADUATED".equalsIgnoreCase(archiveReason.trim())) {
+                showError("Graduated students cannot be re-enrolled. Student \"" + student.getName() + "\" has already graduated.");
+                return;
+            }
+            
             // Load Add Student FXML
             javafx.fxml.FXMLLoader loader = new javafx.fxml.FXMLLoader(getClass().getResource("/FXML/AddStudent.fxml"));
             loader.setControllerFactory(applicationContext::getBean);

@@ -46,9 +46,16 @@ public class ReEnrollmentController {
             // 1. From previous school year
             // 2. Grade 11 (will be promoted to Grade 12) OR Grade 12 (failed, will remain in Grade 12)
             // 3. Not archived
+            // 4. Not graduated (archive reason must not be "GRADUATED")
             List<StudentDto> eligibleStudents = allStudents.stream()
                 .filter(student -> {
                     if (Boolean.TRUE.equals(student.getIsArchived())) {
+                        // Check if student is graduated - exclude from re-enrollment
+                        String archiveReason = student.getArchiveReason();
+                        if (archiveReason != null && "GRADUATED".equalsIgnoreCase(archiveReason.trim())) {
+                            return false;
+                        }
+                        // Other archived students are also excluded
                         return false;
                     }
                     
@@ -88,6 +95,12 @@ public class ReEnrollmentController {
             
             Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new RuntimeException("Student not found with id: " + studentId));
+            
+            // Check if student is graduated - prevent re-enrollment
+            String archiveReason = student.getArchiveReason();
+            if (archiveReason != null && "GRADUATED".equalsIgnoreCase(archiveReason.trim())) {
+                throw new RuntimeException("Graduated students cannot be re-enrolled. Student \"" + student.getName() + "\" has already graduated.");
+            }
             
             // Get current school year
             com.enrollment.system.model.SchoolYear currentSchoolYear = schoolYearService.getCurrentSchoolYearEntity();
@@ -142,6 +155,14 @@ public class ReEnrollmentController {
                 try {
                     Student student = studentRepository.findById(studentId)
                         .orElseThrow(() -> new RuntimeException("Student not found"));
+                    
+                    // Check if student is graduated - prevent re-enrollment
+                    String archiveReason = student.getArchiveReason();
+                    if (archiveReason != null && "GRADUATED".equalsIgnoreCase(archiveReason.trim())) {
+                        failCount++;
+                        errors.add("Student " + studentId + " (\"" + student.getName() + "\"): Graduated students cannot be re-enrolled.");
+                        continue;
+                    }
                     
                     StudentDto studentDto = StudentDto.fromStudent(student);
                     

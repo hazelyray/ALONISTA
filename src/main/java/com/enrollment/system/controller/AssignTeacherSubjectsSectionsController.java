@@ -124,6 +124,11 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
     private ObservableList<String> allStrands;
     private ObservableList<AssignmentRecord> assignments;
     
+    // Debouncing and synchronization for save operations
+    private java.util.Timer saveTimer;
+    private final Object saveLock = new Object();
+    private volatile boolean isSaving = false;
+    
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         // Initialize table columns
@@ -1042,8 +1047,8 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
         strandComboBox.setValue(null);
         gradeComboBox.setValue(null);
         
-        // Save to database in background
-        saveAssignments();
+        // Save to database in background with debouncing
+        scheduleSave();
     }
     
     private void handleRemoveAssignment(AssignmentRecord record, int index) {
@@ -1071,7 +1076,7 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                     );
                 }
                 updateAssignmentsCount();
-                saveAssignments();
+                scheduleSave();
             }
         });
     }
@@ -1094,29 +1099,76 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                 // Clear all assignments
                 assignments.clear();
                 updateAssignmentsCount();
-                saveAssignments();
+                scheduleSave();
             }
         });
     }
     
+    /**
+     * Schedules a save operation with debouncing to batch rapid changes.
+     * This prevents multiple concurrent database operations when users add/remove quickly.
+     */
+    private void scheduleSave() {
+        if (teacher == null) {
+            return;
+        }
+        
+        // Cancel any pending save timer
+        synchronized (saveLock) {
+            if (saveTimer != null) {
+                saveTimer.cancel();
+                saveTimer = null;
+            }
+            
+            // Create new timer for debounced save (500ms delay)
+            saveTimer = new java.util.Timer(true); // daemon thread
+            saveTimer.schedule(new java.util.TimerTask() {
+                @Override
+                public void run() {
+                    synchronized (saveLock) {
+                        saveTimer = null;
+                    }
+                    saveAssignments();
+                }
+            }, 500); // Wait 500ms after last change before saving
+        }
+    }
+    
+    /**
+     * Performs the actual save operation with synchronization to prevent concurrent saves.
+     */
     private void saveAssignments() {
         if (teacher == null) {
             return;
         }
         
+        // Synchronize to prevent concurrent saves
+        synchronized (saveLock) {
+            // Check if already saving
+            if (isSaving) {
+                // If already saving, reschedule for later
+                scheduleSave();
+                return;
+            }
+            
+            isSaving = true;
+        }
+        
         // Disable assign button to prevent concurrent saves
-        assignButton.setDisable(true);
-        assignButton.setText("Saving...");
+        Platform.runLater(() -> {
+            assignButton.setDisable(true);
+            assignButton.setText("Saving...");
+        });
         
         // Run database operation in background thread
         new Thread(() -> {
             try {
                 TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
                 transactionTemplate.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
-                transactionTemplate.setTimeout(30);
+                transactionTemplate.setTimeout(15); // Reduced timeout for faster failure detection
                 
-                int maxRetries = 5;
-                int retryDelay = 200;
+                int maxRetries = 3; // Reduced retries since we have better locking now
+                int baseRetryDelay = 100; // Start with shorter delay
                 Exception lastException = null;
                 
                 // Capture current assignments list to save
@@ -1130,7 +1182,7 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                                 throw new RuntimeException("A teacher can have a maximum of 8 total assignments (subject-section pairs). Found: " + assignmentsToSave.size());
                             }
                             
-                            // Save actual assignments (subject-section pairs)
+                            // Save actual assignments (subject-section pairs) - now uses incremental updates
                             teacherService.saveTeacherAssignments(teacher.getId(), assignmentsToSave);
                             
                             return null;
@@ -1146,11 +1198,13 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                         if (errorMessage != null && (errorMessage.contains("SQLITE_BUSY") || 
                             errorMessage.contains("database is locked") || 
                             errorMessage.contains("database locked") ||
-                            errorMessage.contains("SQLITE_BUSY_SNAPSHOT"))) {
+                            errorMessage.contains("SQLITE_BUSY_SNAPSHOT") ||
+                            errorMessage.contains("SQL_BUSY"))) {
                             
                             if (attempt < maxRetries - 1) {
                                 try {
-                                    Thread.sleep(retryDelay * (attempt + 1));
+                                    // Exponential backoff: 100ms, 200ms, 400ms
+                                    Thread.sleep(baseRetryDelay * (1 << attempt));
                                 } catch (InterruptedException ie) {
                                     Thread.currentThread().interrupt();
                                     Platform.runLater(() -> {
@@ -1158,6 +1212,9 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                                         assignButton.setText("Assign");
                                         showError("Operation was interrupted. Please try again.");
                                     });
+                                    synchronized (saveLock) {
+                                        isSaving = false;
+                                    }
                                     return;
                                 }
                                 continue;
@@ -1179,16 +1236,6 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                     // Re-enable assign button after reload completes
                     assignButton.setDisable(false);
                     assignButton.setText("Assign");
-                    
-                    // Show success message (non-blocking)
-                    Platform.runLater(() -> {
-                        Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
-                        successAlert.setTitle("Success");
-                        successAlert.setHeaderText("Assignments Saved Successfully");
-                        successAlert.setContentText("The teacher's subject and section assignments have been saved. " +
-                                                      "The teacher dashboard will reflect these changes when refreshed.");
-                        successAlert.showAndWait();
-                    });
                 });
                 
             } catch (Exception e) {
@@ -1204,7 +1251,7 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                         detailedError = "Error: " + errorMessage + "\n\nPlease ensure all subjects and sections exist in the database.";
                     } else if (errorMessage.contains("null")) {
                         detailedError = "Error: Invalid assignment data. " + errorMessage + "\n\nPlease try removing and re-adding the assignment.";
-                    } else if (errorMessage.contains("SQLITE") || errorMessage.contains("database")) {
+                    } else if (errorMessage.contains("SQLITE") || errorMessage.contains("SQL_BUSY") || errorMessage.contains("database")) {
                         detailedError = "Database error: " + errorMessage + "\n\nPlease try again. If the problem persists, restart the application.";
                     } else {
                         detailedError = "Error saving assignments: " + errorMessage;
@@ -1221,6 +1268,11 @@ public class AssignTeacherSubjectsSectionsController implements Initializable {
                     assignButton.setText("Assign");
                     showError(detailedError);
                 });
+            } finally {
+                // Always release the lock
+                synchronized (saveLock) {
+                    isSaving = false;
+                }
             }
         }).start();
     }

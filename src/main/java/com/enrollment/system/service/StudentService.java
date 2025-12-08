@@ -44,6 +44,14 @@ public class StudentService {
             if (studentRepository.existsByNameIgnoreCase(studentName)) {
                 throw new RuntimeException("A student with the name \"" + studentName + "\" already exists. Student names must be unique.");
             }
+            
+            // Validate: Student name cannot match parent name without suffix
+            String parentName = studentDto.getParentGuardianName() != null ? studentDto.getParentGuardianName().trim() : null;
+            if (parentName != null && !parentName.isEmpty()) {
+                if (namesMatchWithoutSuffix(studentName, parentName)) {
+                    throw new RuntimeException("Student name cannot be the same as parent/guardian name. If they share the same name, the student must have a suffix (e.g., Jr., Sr., II, III, IV). Example: \"Arnel Caparoso Jr.\"");
+                }
+            }
         }
         
         Student student = new Student();
@@ -256,6 +264,19 @@ public class StudentService {
                     throw new RuntimeException("A student with the name \"" + newName + "\" already exists. Student names must be unique.");
                 }
             }
+            
+            // Validate: Student name cannot match parent name without suffix
+            String parentName = studentDto.getParentGuardianName() != null ? studentDto.getParentGuardianName().trim() : null;
+            if (parentName == null || parentName.isEmpty()) {
+                // If parent name is not provided in update, check existing parent name
+                parentName = student.getParentGuardianName() != null ? student.getParentGuardianName().trim() : null;
+            }
+            if (parentName != null && !parentName.isEmpty()) {
+                if (namesMatchWithoutSuffix(newName, parentName)) {
+                    throw new RuntimeException("Student name cannot be the same as parent/guardian name. If they share the same name, the student must have a suffix (e.g., Jr., Sr., II, III, IV). Example: \"Arnel Caparoso Jr.\"");
+                }
+            }
+            
             student.setName(newName);
         } else if (newName == null || newName.isEmpty()) {
             throw new RuntimeException("Student name cannot be empty.");
@@ -399,8 +420,14 @@ public class StudentService {
         // Unarchive student if they are being re-enrolled (from archive)
         // This happens when a student is being re-enrolled from the archive list
         // If the student was archived and is being updated to "Enrolled" status, unarchive them
+        // BUT: Do not allow graduated students to be re-enrolled
         Boolean wasArchived = student.getIsArchived();
         if (wasArchived != null && wasArchived && "Enrolled".equals(studentDto.getEnrollmentStatus())) {
+            // Check if student is graduated - prevent re-enrollment
+            String archiveReason = student.getArchiveReason();
+            if (archiveReason != null && "GRADUATED".equalsIgnoreCase(archiveReason.trim())) {
+                throw new RuntimeException("Graduated students cannot be re-enrolled. Student \"" + student.getName() + "\" has already graduated.");
+            }
             // Unarchive the student - they're being re-enrolled and moved back to active students
             student.setIsArchived(false);
             student.setArchiveReason(null);
@@ -437,6 +464,15 @@ public class StudentService {
                     throw new RuntimeException("A student with the name \"" + newName + "\" already exists. Student names must be unique.");
                 }
             }
+            
+            // Validate: Student name cannot match parent name without suffix
+            String parentName = student.getParentGuardianName() != null ? student.getParentGuardianName().trim() : null;
+            if (parentName != null && !parentName.isEmpty()) {
+                if (namesMatchWithoutSuffix(newName, parentName)) {
+                    throw new RuntimeException("Student name cannot be the same as parent/guardian name. If they share the same name, the student must have a suffix (e.g., Jr., Sr., II, III, IV). Example: \"Arnel Caparoso Jr.\"");
+                }
+            }
+            
             student.setName(newName);
         } else {
             throw new RuntimeException("Student name cannot be empty.");
@@ -771,6 +807,65 @@ public class StudentService {
         }
         
         return newName;
+    }
+    
+    /**
+     * Checks if two names match when ignoring common suffixes (Jr., Sr., II, III, IV, etc.)
+     * Returns true if the names are the same after removing suffixes, false otherwise.
+     */
+    private boolean namesMatchWithoutSuffix(String name1, String name2) {
+        if (name1 == null || name2 == null) {
+            return false;
+        }
+        
+        // Normalize names: trim and convert to lowercase
+        String normalized1 = name1.trim().toLowerCase();
+        String normalized2 = name2.trim().toLowerCase();
+        
+        // Remove common suffixes from both names
+        normalized1 = removeSuffixes(normalized1);
+        normalized2 = removeSuffixes(normalized2);
+        
+        // Compare normalized names
+        return normalized1.equals(normalized2);
+    }
+    
+    /**
+     * Removes common name suffixes from a name string.
+     * Suffixes: jr, sr, ii, iii, iv, v, junior, senior, 2nd, 3rd, 4th, etc.
+     */
+    private String removeSuffixes(String name) {
+        if (name == null || name.isEmpty()) {
+            return name;
+        }
+        
+        // Common suffixes to remove (case-insensitive)
+        String[] suffixes = {
+            "jr", "sr", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x",
+            "junior", "senior", "2nd", "3rd", "4th", "5th",
+            "jr.", "sr.", "ii.", "iii.", "iv.", "v.", "vi.", "vii.", "viii.", "ix.", "x."
+        };
+        
+        String normalized = name.trim();
+        
+        // Remove suffixes from the end of the name
+        for (String suffix : suffixes) {
+            // Check if name ends with suffix (with or without period)
+            String suffixWithSpace = " " + suffix;
+            String suffixWithSpacePeriod = " " + suffix + ".";
+            
+            if (normalized.endsWith(suffixWithSpacePeriod)) {
+                normalized = normalized.substring(0, normalized.length() - suffixWithSpacePeriod.length()).trim();
+            } else if (normalized.endsWith(suffixWithSpace)) {
+                normalized = normalized.substring(0, normalized.length() - suffixWithSpace.length()).trim();
+            } else if (normalized.endsWith(suffix + ".")) {
+                normalized = normalized.substring(0, normalized.length() - (suffix.length() + 1)).trim();
+            } else if (normalized.endsWith(suffix)) {
+                normalized = normalized.substring(0, normalized.length() - suffix.length()).trim();
+            }
+        }
+        
+        return normalized;
     }
     
     private int calculateAge(LocalDate birthdate) {

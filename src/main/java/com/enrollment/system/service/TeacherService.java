@@ -304,116 +304,146 @@ public class TeacherService {
                 .filter(user -> user.getRole() == User.UserRole.TEACHER)
                 .orElseThrow(() -> new RuntimeException("Teacher not found with id: " + teacherId));
         
-        // Delete all existing assignments for this teacher first
-        teacherAssignmentRepository.deleteByTeacherId(teacherId);
-        
-        // Flush to ensure delete is committed before inserts (prevents unique constraint violations)
-        teacherAssignmentRepository.flush();
-        
-        // If no assignments to save, we're done
-        if (assignments == null || assignments.isEmpty()) {
-            return;
-        }
-        
-        // Remove duplicates from assignments list to prevent unique constraint violations
-        // Use a Set to track unique combinations of (subjectId, sectionId)
+        // Normalize input assignments - remove duplicates and invalid entries
         Set<String> seenCombinations = new HashSet<>();
         List<com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord> uniqueAssignments = new ArrayList<>();
         
-        for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : assignments) {
-            if (assignmentRecord.getSubject() == null || assignmentRecord.getSubject().getId() == null ||
-                assignmentRecord.getSection() == null || assignmentRecord.getSection().getId() == null) {
-                continue; // Skip invalid assignments
-            }
-            
-            String combination = assignmentRecord.getSubject().getId() + "_" + assignmentRecord.getSection().getId();
-            if (!seenCombinations.contains(combination)) {
-                seenCombinations.add(combination);
-                uniqueAssignments.add(assignmentRecord);
+        if (assignments != null) {
+            for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : assignments) {
+                if (assignmentRecord.getSubject() == null || assignmentRecord.getSubject().getId() == null ||
+                    assignmentRecord.getSection() == null || assignmentRecord.getSection().getId() == null) {
+                    continue; // Skip invalid assignments
+                }
+                
+                String combination = assignmentRecord.getSubject().getId() + "_" + assignmentRecord.getSection().getId();
+                if (!seenCombinations.contains(combination)) {
+                    seenCombinations.add(combination);
+                    uniqueAssignments.add(assignmentRecord);
+                }
             }
         }
-        
-        // Extract and validate IDs from unique assignments
-        List<Long> subjectIds = uniqueAssignments.stream()
-                .map(a -> a.getSubject().getId())
-                .distinct()
-                .collect(Collectors.toList());
-        
-        List<Long> sectionIds = uniqueAssignments.stream()
-                .map(a -> a.getSection().getId())
-                .distinct()
-                .collect(Collectors.toList());
         
         // Validate maximum 8 total assignments (subject-section pairs)
         if (uniqueAssignments.size() > 8) {
             throw new RuntimeException("A teacher can have a maximum of 8 total assignments (subject-section pairs). Found: " + uniqueAssignments.size());
         }
         
-        // Fetch all subjects and sections fresh from database
-        List<Subject> subjects = subjectRepository.findAllById(subjectIds);
-        if (subjects.size() != subjectIds.size()) {
-            throw new RuntimeException("One or more subjects not found in database");
-        }
+        // Get current assignments from database (more efficient than delete-all)
+        List<TeacherAssignment> existingAssignments = teacherAssignmentRepository.findByTeacherId(teacherId);
         
-        List<Section> sections = sectionRepository.findAllById(sectionIds);
-        if (sections.size() != sectionIds.size()) {
-            throw new RuntimeException("One or more sections not found in database");
-        }
+        // Create sets for comparison
+        Set<String> newCombinations = new HashSet<>();
+        Map<String, TeacherAssignment> existingMap = new HashMap<>();
         
-        // Create a map for quick lookup
-        Map<Long, Subject> subjectMap = subjects.stream()
-                .collect(Collectors.toMap(Subject::getId, s -> s));
-        Map<Long, Section> sectionMap = sections.stream()
-                .collect(Collectors.toMap(Section::getId, s -> s));
-        
-        // Track what we're inserting to prevent duplicates in the same batch
-        Set<String> insertedCombinations = new HashSet<>();
-        List<TeacherAssignment> assignmentsToSave = new ArrayList<>();
-        
-        // Create new assignments using fresh entities from database
         for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : uniqueAssignments) {
             Long subjectId = assignmentRecord.getSubject().getId();
             Long sectionId = assignmentRecord.getSection().getId();
-            
-            // Check for duplicates in the same batch
             String combination = subjectId + "_" + sectionId;
-            if (insertedCombinations.contains(combination)) {
-                continue; // Skip duplicate
-            }
-            insertedCombinations.add(combination);
-            
-            // Check if this subject-section combination is already assigned to a different teacher
-            java.util.Optional<TeacherAssignment> conflictingAssignment = 
-                teacherAssignmentRepository.findBySubjectIdAndSectionIdExcludingTeacher(subjectId, sectionId, teacherId);
-            
-            if (conflictingAssignment.isPresent()) {
-                TeacherAssignment conflict = conflictingAssignment.get();
-                String conflictingTeacherName = conflict.getTeacher() != null ? conflict.getTeacher().getFullName() : "Unknown Teacher";
-                throw new RuntimeException("Subject-section combination is already assigned to teacher: " + conflictingTeacherName + 
-                                         ". A subject-section combination can only be assigned to one teacher at a time.");
-            }
-            
-            // Get fresh entities from database
-            Subject subject = subjectMap.get(subjectId);
-            Section section = sectionMap.get(sectionId);
-            
-            if (subject == null) {
-                throw new RuntimeException("Subject not found with id: " + subjectId);
-            }
-            if (section == null) {
-                throw new RuntimeException("Section not found with id: " + sectionId);
-            }
-            
-            // Create new assignment with fresh managed entities
-            TeacherAssignment assignment = new TeacherAssignment(teacher, subject, section);
-            assignmentsToSave.add(assignment);
+            newCombinations.add(combination);
         }
         
-        // Save all assignments in batch
-        if (!assignmentsToSave.isEmpty()) {
-            teacherAssignmentRepository.saveAll(assignmentsToSave);
-            teacherAssignmentRepository.flush(); // Ensure all inserts are committed
+        for (TeacherAssignment existing : existingAssignments) {
+            if (existing.getSubject() != null && existing.getSection() != null) {
+                String combination = existing.getSubject().getId() + "_" + existing.getSection().getId();
+                existingMap.put(combination, existing);
+            }
         }
+        
+        // Determine what to delete (exists in DB but not in new list)
+        List<TeacherAssignment> toDelete = new ArrayList<>();
+        for (Map.Entry<String, TeacherAssignment> entry : existingMap.entrySet()) {
+            if (!newCombinations.contains(entry.getKey())) {
+                toDelete.add(entry.getValue());
+            }
+        }
+        
+        // Determine what to add (exists in new list but not in DB)
+        List<com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord> toAdd = new ArrayList<>();
+        for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : uniqueAssignments) {
+            Long subjectId = assignmentRecord.getSubject().getId();
+            Long sectionId = assignmentRecord.getSection().getId();
+            String combination = subjectId + "_" + sectionId;
+            if (!existingMap.containsKey(combination)) {
+                toAdd.add(assignmentRecord);
+            }
+        }
+        
+        // Delete only what needs to be removed (incremental update)
+        if (!toDelete.isEmpty()) {
+            teacherAssignmentRepository.deleteAll(toDelete);
+        }
+        
+        // Add only what needs to be added (incremental update)
+        if (!toAdd.isEmpty()) {
+            // Extract IDs for validation
+            List<Long> subjectIds = toAdd.stream()
+                    .map(a -> a.getSubject().getId())
+                    .distinct()
+                    .collect(Collectors.toList());
+            
+            List<Long> sectionIds = toAdd.stream()
+                    .map(a -> a.getSection().getId())
+                    .distinct()
+                    .collect(Collectors.toList());
+            
+            // Fetch all subjects and sections fresh from database
+            List<Subject> subjects = subjectRepository.findAllById(subjectIds);
+            if (subjects.size() != subjectIds.size()) {
+                throw new RuntimeException("One or more subjects not found in database");
+            }
+            
+            List<Section> sections = sectionRepository.findAllById(sectionIds);
+            if (sections.size() != sectionIds.size()) {
+                throw new RuntimeException("One or more sections not found in database");
+            }
+            
+            // Create maps for quick lookup
+            Map<Long, Subject> subjectMap = subjects.stream()
+                    .collect(Collectors.toMap(Subject::getId, s -> s));
+            Map<Long, Section> sectionMap = sections.stream()
+                    .collect(Collectors.toMap(Section::getId, s -> s));
+            
+            // Validate conflicts and create new assignments
+            List<TeacherAssignment> assignmentsToSave = new ArrayList<>();
+            for (com.enrollment.system.controller.AssignTeacherSubjectsSectionsController.AssignmentRecord assignmentRecord : toAdd) {
+                Long subjectId = assignmentRecord.getSubject().getId();
+                Long sectionId = assignmentRecord.getSection().getId();
+                
+                // Check if this subject-section combination is already assigned to a different teacher
+                java.util.Optional<TeacherAssignment> conflictingAssignment = 
+                    teacherAssignmentRepository.findBySubjectIdAndSectionIdExcludingTeacher(subjectId, sectionId, teacherId);
+                
+                if (conflictingAssignment.isPresent()) {
+                    TeacherAssignment conflict = conflictingAssignment.get();
+                    String conflictingTeacherName = conflict.getTeacher() != null ? conflict.getTeacher().getFullName() : "Unknown Teacher";
+                    throw new RuntimeException("Subject-section combination is already assigned to teacher: " + conflictingTeacherName + 
+                                             ". A subject-section combination can only be assigned to one teacher at a time.");
+                }
+                
+                // Get fresh entities from database
+                Subject subject = subjectMap.get(subjectId);
+                Section section = sectionMap.get(sectionId);
+                
+                if (subject == null) {
+                    throw new RuntimeException("Subject not found with id: " + subjectId);
+                }
+                if (section == null) {
+                    throw new RuntimeException("Section not found with id: " + sectionId);
+                }
+                
+                // Create new assignment with fresh managed entities
+                TeacherAssignment assignment = new TeacherAssignment(teacher, subject, section);
+                assignmentsToSave.add(assignment);
+            }
+            
+            // Save new assignments
+            if (!assignmentsToSave.isEmpty()) {
+                teacherAssignmentRepository.saveAll(assignmentsToSave);
+            }
+        }
+        
+        // Single flush at the end (more efficient)
+        teacherAssignmentRepository.flush();
     }
     
     @Transactional
