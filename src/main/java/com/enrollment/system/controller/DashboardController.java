@@ -97,6 +97,9 @@ public class DashboardController {
     @FXML
     private Button btnStrandAndSection;
     
+    @FXML
+    private Button btnSubjectManagement;
+    
     @Autowired
     private ApplicationContext applicationContext;
     
@@ -157,6 +160,7 @@ public class DashboardController {
             setupMainButtonHover(btnDashboard, "#3498db");
             setupMainButtonHover(btnStudentManagement, "#3498db");
             setupMainButtonHover(btnStrandAndSection, "#9b59b6");
+            setupMainButtonHover(btnSubjectManagement, "#16a085");
             setupMainButtonHover(btnReports, "#3498db");
             setupMainButtonHover(btnSettings, "#e67e22");
         } catch (Exception e) {
@@ -889,6 +893,44 @@ public class DashboardController {
     }
     
     @FXML
+    private void showSubjectManagement() {
+        resetMainButtonStyles();
+        if (btnSubjectManagement != null) {
+            btnSubjectManagement.setStyle("-fx-background-color: #16a085; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(22,160,133,0.4), 8, 0, 0, 0);");
+        }
+        
+        try {
+            // Load Subject Management FXML
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("/FXML/SubjectManagement.fxml"));
+            loader.setControllerFactory(applicationContext::getBean);
+            Parent subjectManagementRoot = loader.load();
+            
+            // Create new stage for Subject Management
+            Stage subjectManagementStage = new Stage();
+            subjectManagementStage.setTitle("Subject Management - Seguinon SHS Enrollment System");
+            subjectManagementStage.setScene(new Scene(subjectManagementRoot));
+            subjectManagementStage.setWidth(1200);
+            subjectManagementStage.setHeight(800);
+            subjectManagementStage.setResizable(true);
+            
+            // Set owner to dashboard stage
+            Stage dashboardStage = (Stage) btnSubjectManagement.getScene().getWindow();
+            subjectManagementStage.initOwner(dashboardStage);
+            
+            // Show Subject Management window
+            subjectManagementStage.show();
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to load Subject Management page");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+        }
+    }
+    
+    @FXML
     private void handleLogout() {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle("Logout");
@@ -981,6 +1023,9 @@ public class DashboardController {
         }
         if (btnStrandAndSection != null) {
             btnStrandAndSection.setStyle(defaultStyle);
+        }
+        if (btnSubjectManagement != null) {
+            btnSubjectManagement.setStyle(defaultStyle);
         }
         if (btnReports != null) {
             btnReports.setStyle(defaultStyle);

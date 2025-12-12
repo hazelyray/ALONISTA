@@ -26,6 +26,12 @@ public class Subject {
     @Column(name = "is_custom", nullable = false)
     private Boolean isCustom = false;
     
+    @Column(name = "strand", length = 50)
+    private String strand; // For specialized subjects: STEM, ABM, HUMSS, GAS, TVL-ICT
+    
+    @Column(name = "subject_type", length = 20)
+    private String subjectType; // "CORE" or "SPECIALIZED"
+    
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
@@ -94,6 +100,22 @@ public class Subject {
     
     public void setIsCustom(Boolean isCustom) {
         this.isCustom = isCustom;
+    }
+    
+    public String getStrand() {
+        return strand;
+    }
+    
+    public void setStrand(String strand) {
+        this.strand = strand;
+    }
+    
+    public String getSubjectType() {
+        return subjectType;
+    }
+    
+    public void setSubjectType(String subjectType) {
+        this.subjectType = subjectType;
     }
     
     public LocalDateTime getCreatedAt() {

@@ -58,6 +58,9 @@
             <Button fx:id="btnStrandAndSection" text="  📋 Strand and Section" onAction="#showStrandAndSection"
                     style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
             
+            <Button fx:id="btnSubjectManagement" text="  📚 Subject Management" onAction="#showSubjectManagement"
+                    style="-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 14 20; -fx-alignment: center-left; -fx-background-radius: 8; -fx-cursor: hand; -fx-pref-width: 250; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 5, 0, 2, 2);"/>
+            
             <!-- Reports - Expandable Menu -->
             <VBox spacing="2">
                 <Button fx:id="btnReports" text="  📈 Reports" 

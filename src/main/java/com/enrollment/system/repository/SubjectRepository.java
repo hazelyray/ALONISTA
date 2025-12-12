@@ -18,5 +18,17 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     Optional<Subject> findByNameAndGradeLevel(String name, Integer gradeLevel);
     
     boolean existsByNameAndGradeLevel(String name, Integer gradeLevel);
+    
+    List<Subject> findByStrand(String strand);
+    
+    List<Subject> findBySubjectType(String subjectType);
+    
+    List<Subject> findByGradeLevelAndSubjectType(Integer gradeLevel, String subjectType);
+    
+    List<Subject> findByGradeLevelAndStrand(Integer gradeLevel, String strand);
+    
+    List<Subject> findBySubjectTypeAndStrand(String subjectType, String strand);
+    
+    List<Subject> findByGradeLevelAndSubjectTypeAndStrand(Integer gradeLevel, String subjectType, String strand);
 }
 

@@ -1179,74 +1179,507 @@ public class DataInitializer implements CommandLineRunner {
             return;
         }
         
-        // Grade 11 Subjects
-        String[] grade11Subjects = {
+        // Build comprehensive list of valid subjects
+        java.util.Set<String> validSubjects = new java.util.HashSet<>();
+        
+        // GRADE 11 CORE SUBJECTS (All Strands)
+        String[] grade11CoreSubjects = {
             "Oral Communication",
-            "Komunikasyon at Pananaliksik sa Wika at Kulturang Pilipino",
-            "21st Century Literature from the Philippines and the World",
-            "Contemporary Philippine Arts from the Regions",
-            "Media and Information Literacy",
+            "Komunikasyon at Pananaliksik sa Wika at Kulturang Filipino",
             "General Mathematics",
-            "Statistics and Probability",
             "Earth and Life Science",
-            "Physical Science",
-            "Personal Development",
-            "Understanding Culture, Society and Politics",
-            "Introduction to the Philosophy of the Human Person",
-            "Physical Education and Health",
-            "Reading and Writing Skills"
+            "21st Century Literature from the Philippines and the World",
+            "Physical Education & Health 1",
+            "Physical Education & Health 2"
         };
         
-        // Grade 12 Subjects
-        String[] grade12Subjects = {
+        // GRADE 12 CORE SUBJECTS (All Strands)
+        String[] grade12CoreSubjects = {
+            "Reading and Writing",
+            "Pagbasa at Pagsusuri ng Iba't Ibang Teksto Tungo sa Pananaliksik",
+            "Statistics and Probability",
+            "Physical Science",
+            "Understanding Culture, Society and Politics (UCSP)",
+            "Contemporary Philippine Arts from the Regions (CPAR)",
+            "Introduction to the Philosophy of the Human Person (IPHP)",
+            "Media and Information Literacy (MIL)",
+            "Physical Education & Health 3",
+            "Physical Education & Health 4"
+        };
+        
+        // STEM STRAND - Grade 11 Major Subjects
+        String[] stem11Subjects = {
+            "Pre-Calculus",
+            "Basic Calculus",
+            "General Biology 1",
+            "General Chemistry 1",
+            "General Physics 1"
+        };
+        
+        // STEM STRAND - Grade 12 Major Subjects
+        String[] stem12Subjects = {
+            "General Biology 2",
+            "General Chemistry 2",
+            "General Physics 2",
+            "Disaster Readiness and Risk Reduction (DRRR)",
+            "Research / Inquiry, Investigation and Immersion"
+        };
+        
+        // ABM STRAND - Grade 11 Major Subjects
+        String[] abm11Subjects = {
+            "Applied Economics",
+            "Business Math",
+            "Organization and Management",
+            "Fundamentals of Accountancy, Business & Management 1 (FABM 1)"
+        };
+        
+        // ABM STRAND - Grade 12 Major Subjects
+        String[] abm12Subjects = {
+            "Fundamentals of Accountancy, Business & Management 2 (FABM 2)",
+            "Business Finance",
+            "Principles of Marketing",
+            "Business Ethics and Social Responsibility",
+            "Work Immersion / Business Research"
+        };
+        
+        // HUMSS STRAND - Grade 11 Major Subjects
+        String[] humss11Subjects = {
             "Creative Writing",
             "Creative Nonfiction",
-            "World Literature",
-            "Philippine Literature",
-            "Research in Daily Life 1",
-            "Research in Daily Life 2",
-            "Practical Research 1",
-            "Practical Research 2",
-            "Disaster Readiness and Risk Reduction",
-            "Earth Science",
-            "Physical Education and Health",
-            "Empowerment Technologies",
-            "Entrepreneurship",
-            "Inquiries, Investigations and Immersion"
+            "Introduction to World Religions and Belief Systems",
+            "Community Engagement, Solidarity and Citizenship"
         };
         
-        int subjectsCreated = 0;
+        // HUMSS STRAND - Grade 12 Major Subjects
+        String[] humss12Subjects = {
+            "Disciplines and Ideas in the Social Sciences (DISS)",
+            "Disciplines and Ideas in the Applied Social Sciences (DIASS)",
+            "Philippine Politics and Governance",
+            "Humanities 1",
+            "Humanities 2",
+            "Work Immersion / Research"
+        };
         
-        // Create Grade 11 subjects
-        for (String subjectName : grade11Subjects) {
-            if (!subjectRepository.existsByNameAndGradeLevel(subjectName, 11)) {
+        // GAS STRAND - Grade 11 Major Subjects
+        String[] gas11Subjects = {
+            "Humanities 1",
+            "Social Science 1",
+            "Applied Economics",
+            "Organization and Management"
+        };
+        
+        // GAS STRAND - Grade 12 Major Subjects
+        String[] gas12Subjects = {
+            "Humanities 2",
+            "Social Science 2",
+            "Disaster Readiness and Risk Reduction (DRRR)",
+            "Work Immersion / Research"
+        };
+        
+        // TVL-ICT STRAND - Grade 11 Major Subjects
+        String[] tvlIct11Subjects = {
+            "Computer Systems Servicing (CSS) 1",
+            "Computer Systems Servicing (CSS) 2",
+            "Introduction to Computing",
+            "Computer Programming 1",
+            "Empowerment Technologies (E-Tech)"
+        };
+        
+        // TVL-ICT STRAND - Grade 12 Major Subjects
+        String[] tvlIct12Subjects = {
+            "Computer Programming 2",
+            "Web Development / Web Technologies",
+            "Animation / Graphic Illustration",
+            "Practical Research / Inquiries, Investigations & Immersion",
+            "Work Immersion"
+        };
+        
+        // Build set of all valid subjects (grade:name format)
+        for (String name : grade11CoreSubjects) {
+            validSubjects.add("11:" + name);
+        }
+        for (String name : grade12CoreSubjects) {
+            validSubjects.add("12:" + name);
+        }
+        for (String name : stem11Subjects) {
+            validSubjects.add("11:" + name);
+        }
+        for (String name : stem12Subjects) {
+            validSubjects.add("12:" + name);
+        }
+        for (String name : abm11Subjects) {
+            validSubjects.add("11:" + name);
+        }
+        for (String name : abm12Subjects) {
+            validSubjects.add("12:" + name);
+        }
+        for (String name : humss11Subjects) {
+            validSubjects.add("11:" + name);
+        }
+        for (String name : humss12Subjects) {
+            validSubjects.add("12:" + name);
+        }
+        for (String name : gas11Subjects) {
+            validSubjects.add("11:" + name);
+        }
+        for (String name : gas12Subjects) {
+            validSubjects.add("12:" + name);
+        }
+        for (String name : tvlIct11Subjects) {
+            validSubjects.add("11:" + name);
+        }
+        for (String name : tvlIct12Subjects) {
+            validSubjects.add("12:" + name);
+        }
+        
+        // PERMANENTLY DELETE all subjects that are NOT in the valid list
+        System.out.println("🔄 Permanently deleting all old subjects not in the comprehensive list...");
+        java.util.List<com.enrollment.system.model.Subject> allExistingSubjects = subjectRepository.findAll();
+        int deletedCount = 0;
+        java.util.List<com.enrollment.system.model.Subject> toDelete = new java.util.ArrayList<>();
+        
+        for (com.enrollment.system.model.Subject existingSubject : allExistingSubjects) {
+            String subjectKey = existingSubject.getGradeLevel() + ":" + existingSubject.getName();
+            if (!validSubjects.contains(subjectKey)) {
+                // This subject is NOT in the new list - DELETE IT PERMANENTLY
+                toDelete.add(existingSubject);
+                deletedCount++;
+            }
+        }
+        
+        // Delete all old subjects
+        if (!toDelete.isEmpty()) {
+            subjectRepository.deleteAll(toDelete);
+            System.out.println("✓ Permanently deleted " + deletedCount + " old subjects");
+        } else {
+            System.out.println("✓ No old subjects to delete");
+        }
+        
+        int subjectsCreated = 0;
+        int subjectsUpdated = 0;
+        
+        // Create/Update Grade 11 Core Subjects
+        for (String subjectName : grade11CoreSubjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 11);
+            
+            if (existingOpt.isPresent()) {
+                // Update existing subject
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("CORE");
+                subject.setStrand("ALL STRAND"); // Core subjects are for all strands
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                // Create new subject
                 com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
                 subject.setName(subjectName);
                 subject.setGradeLevel(11);
+                subject.setSubjectType("CORE");
+                subject.setStrand("ALL STRAND"); // Core subjects are for all strands
                 subject.setIsActive(true);
-                subject.setIsCustom(false); // Default subjects are not custom
+                subject.setIsCustom(false);
                 subjectRepository.save(subject);
                 subjectsCreated++;
             }
         }
         
-        // Create Grade 12 subjects
-        for (String subjectName : grade12Subjects) {
-            if (!subjectRepository.existsByNameAndGradeLevel(subjectName, 12)) {
+        // Create/Update Grade 12 Core Subjects
+        for (String subjectName : grade12CoreSubjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 12);
+            
+            if (existingOpt.isPresent()) {
+                // Update existing subject
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("CORE");
+                subject.setStrand("ALL STRAND"); // Core subjects are for all strands
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                // Create new subject
                 com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
                 subject.setName(subjectName);
                 subject.setGradeLevel(12);
+                subject.setSubjectType("CORE");
+                subject.setStrand("ALL STRAND"); // Core subjects are for all strands
                 subject.setIsActive(true);
-                subject.setIsCustom(false); // Default subjects are not custom
+                subject.setIsCustom(false);
                 subjectRepository.save(subject);
                 subjectsCreated++;
             }
         }
         
-        if (subjectsCreated > 0) {
-            System.out.println("✓ Created " + subjectsCreated + " sample subjects (Grade 11 and Grade 12)");
+        // Create/Update STEM Grade 11 subjects
+        for (String subjectName : stem11Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 11);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("STEM");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(11);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("STEM");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update STEM Grade 12 subjects
+        for (String subjectName : stem12Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 12);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("STEM");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(12);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("STEM");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update ABM Grade 11 subjects
+        for (String subjectName : abm11Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 11);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("ABM");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(11);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("ABM");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update ABM Grade 12 subjects
+        for (String subjectName : abm12Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 12);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("ABM");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(12);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("ABM");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update HUMSS Grade 11 subjects
+        for (String subjectName : humss11Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 11);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("HUMSS");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(11);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("HUMSS");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update HUMSS Grade 12 subjects
+        for (String subjectName : humss12Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 12);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("HUMSS");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(12);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("HUMSS");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update GAS Grade 11 subjects
+        for (String subjectName : gas11Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 11);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("GAS");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(11);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("GAS");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update GAS Grade 12 subjects
+        for (String subjectName : gas12Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 12);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("GAS");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(12);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("GAS");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update TVL-ICT Grade 11 subjects
+        for (String subjectName : tvlIct11Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 11);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("TVL-ICT");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(11);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("TVL-ICT");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        // Create/Update TVL-ICT Grade 12 subjects
+        for (String subjectName : tvlIct12Subjects) {
+            java.util.Optional<com.enrollment.system.model.Subject> existingOpt = 
+                subjectRepository.findByNameAndGradeLevel(subjectName, 12);
+            
+            if (existingOpt.isPresent()) {
+                com.enrollment.system.model.Subject subject = existingOpt.get();
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("TVL-ICT");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsUpdated++;
+            } else {
+                com.enrollment.system.model.Subject subject = new com.enrollment.system.model.Subject();
+                subject.setName(subjectName);
+                subject.setGradeLevel(12);
+                subject.setSubjectType("MAJOR");
+                subject.setStrand("TVL-ICT");
+                subject.setIsActive(true);
+                subject.setIsCustom(false);
+                subjectRepository.save(subject);
+                subjectsCreated++;
+            }
+        }
+        
+        if (subjectsCreated > 0 || subjectsUpdated > 0) {
+            System.out.println("✓ Created " + subjectsCreated + " new subjects");
+            System.out.println("✓ Updated " + subjectsUpdated + " existing subjects");
+            System.out.println("✓ Database now contains only the comprehensive subject list (CORE and MAJOR)");
         } else {
-            System.out.println("✓ Subjects already exist in database");
+            System.out.println("✓ All subjects are up to date in database");
         }
         
         // Assign sample subjects to Hazel and Arnel for testing

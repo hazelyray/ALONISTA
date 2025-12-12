@@ -151,5 +151,35 @@ public class SubjectService {
             System.out.println("✓ Fixed NULL isActive values for subjects");
         }
     }
+    
+    @Transactional(readOnly = true)
+    public List<Subject> getSubjectsByStrand(String strand) {
+        return subjectRepository.findByStrand(strand);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<Subject> getSubjectsBySubjectType(String subjectType) {
+        return subjectRepository.findBySubjectType(subjectType);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<Subject> getSubjectsByGradeLevelAndSubjectType(Integer gradeLevel, String subjectType) {
+        return subjectRepository.findByGradeLevelAndSubjectType(gradeLevel, subjectType);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<Subject> getSubjectsByGradeLevelAndStrand(Integer gradeLevel, String strand) {
+        return subjectRepository.findByGradeLevelAndStrand(gradeLevel, strand);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<Subject> getSubjectsBySubjectTypeAndStrand(String subjectType, String strand) {
+        return subjectRepository.findBySubjectTypeAndStrand(subjectType, strand);
+    }
+    
+    @Transactional(readOnly = true)
+    public List<Subject> getSubjectsByGradeLevelAndSubjectTypeAndStrand(Integer gradeLevel, String subjectType, String strand) {
+        return subjectRepository.findByGradeLevelAndSubjectTypeAndStrand(gradeLevel, subjectType, strand);
+    }
 }
 
